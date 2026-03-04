@@ -39,7 +39,10 @@ function shuffleAndPick<T>(arr: T[], count: number): T[] {
 const SUGGEST_RE = /<!--SUGGEST:(.+?)-->/g;
 
 function stripSuggestMarkers(content: string): string {
-  return content.replace(SUGGEST_RE, "").trimEnd();
+  return content
+    .replace(SUGGEST_RE, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .trimEnd();
 }
 
 function parseSuggestions(content: string): string[] {
