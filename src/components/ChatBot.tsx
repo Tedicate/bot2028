@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -8,33 +8,64 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/course-advisor`;
 
-const DEPT_SUGGESTIONS = [
-  "서울대 컴퓨터공학부",
-  "연세대 경영학과",
-  "고려대 전기전자공학부",
-  "성균관대 의예과",
-  "한양대 기계공학부",
-  "경희대 간호학과",
-  "서울시립대 도시공학과",
-  "중앙대 약학부",
+const ALL_DEPT_SUGGESTIONS = [
+  "서울대 컴퓨터공학부", "연세대 경영학과", "고려대 전기전자공학부",
+  "성균관대 의예과", "한양대 기계공학부", "경희대 간호학과",
+  "서울시립대 도시공학과", "중앙대 약학부", "이화여대 국어국문학과",
+  "서강대 경제학부", "숙명여대 미디어학부", "건국대 동물자원과학과",
+  "동국대 영화영상학과", "한국외대 통번역학과", "홍익대 미술학부",
+  "서울대 법학부", "연세대 심리학과", "고려대 국어국문학과",
+  "한양대 건축학부", "경희대 호텔관광학부", "중앙대 문예창작학과",
+  "서울시립대 환경공학부", "숭실대 AI융합학부", "세종대 호텔관광경영학부",
+  "부산대 조경학과", "경북대 농업생명과학대학", "전남대 수의예과",
 ];
 
-const SUBJECT_SUGGESTIONS = [
-  "미적분II",
-  "기하",
-  "역학과 에너지",
-  "물질과 에너지",
-  "정보",
-  "인공지능 기초",
-  "데이터 과학",
-  "생명과학과 지구시스템",
+const ALL_SUBJECT_SUGGESTIONS = [
+  "미적분II", "기하", "역학과 에너지", "물질과 에너지",
+  "정보", "인공지능 기초", "데이터 과학", "생명과학과 지구시스템",
+  "세계시민과 지리", "사회문화", "생활과 윤리", "정치와 법",
+  "심리학", "교육학", "보건", "음악", "미술", "체육",
+  "중국어", "일본어", "프랑스어", "확률과 통계",
+  "화학반응의 세계", "생명과학실험", "지구과학실험",
+  "국어", "영어", "한국사",
 ];
+
+function shuffleAndPick<T>(arr: T[], count: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+// ── Shared utilities ──
+const SUGGEST_RE = /<!--SUGGEST:(.+?)-->/g;
+
+function stripSuggestMarkers(content: string): string {
+  return content.replace(SUGGEST_RE, "").trimEnd();
+}
+
+function parseSuggestions(content: string): string[] {
+  const results: string[] = [];
+  let m: RegExpExecArray | null;
+  const re = new RegExp(SUGGEST_RE.source, "g");
+  while ((m = re.exec(content)) !== null) results.push(m[1]);
+  return results;
+}
+
+// Detects checkbox lines: "- [ ] text" or "[ ] text" (with optional leading whitespace)
+const CHECKBOX_LINE_RE = /^\s*-?\s*\[[ ]\]\s+(.+)$/;
+
+function hasCheckboxLines(content: string): boolean {
+  return content.split("\n").some((line) => CHECKBOX_LINE_RE.test(line));
+}
 
 export default function ChatBot() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Randomize suggestions once per mount
+  const deptSuggestions = useMemo(() => shuffleAndPick(ALL_DEPT_SUGGESTIONS, 8), []);
+  const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -135,14 +166,8 @@ export default function ChatBot() {
     setIsLoading(false);
   };
 
-  // Parse <!--SUGGEST:xxx--> markers and render as buttons
   const renderSuggestionButtons = (content: string) => {
-    const suggestPattern = /<!--SUGGEST:(.+?)-->/g;
-    const suggestions: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = suggestPattern.exec(content)) !== null) {
-      suggestions.push(match[1]);
-    }
+    const suggestions = parseSuggestions(content);
     if (suggestions.length === 0) return null;
     return (
       <div className="flex flex-wrap gap-2 mt-3">
@@ -150,7 +175,7 @@ export default function ChatBot() {
           <button
             key={s}
             onClick={() => send(s)}
-            className="px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+            className="px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20 hover:bg-primary/20 transition-colors"
           >
             {s}
           </button>
@@ -159,26 +184,22 @@ export default function ChatBot() {
     );
   };
 
-  const stripSuggestMarkers = (content: string) => {
-    return content.replace(/<!--SUGGEST:.+?-->/g, "").trimEnd();
-  };
-
-  // Parse assistant messages for interactive elements
   const renderAssistantContent = (content: string, _msgIndex: number) => {
-    // Check for checkbox-style department list: lines like "- [ ] 학과명" or "[ ] 학과명"
-    const checkboxPattern = /^-?\s*\[ \] .+$/m;
-    const hasCheckboxes = checkboxPattern.test(content);
-
-    if (hasCheckboxes) {
-      return <CheckboxMessage content={content} onSubmit={(selected) => {
-        const selectedText = selected.join(", ");
-        send(`다음 학과들의 상세 정보를 보여주세요: ${selectedText}`);
-      }} />;
+    if (hasCheckboxLines(content)) {
+      return (
+        <CheckboxMessage
+          content={content}
+          onSubmit={(selected) => {
+            const selectedText = selected.join(", ");
+            send(`다음 학과들의 상세 정보를 보여주세요: ${selectedText}`);
+          }}
+          renderSuggestions={() => renderSuggestionButtons(content)}
+        />
+      );
     }
 
-    // Check for pagination markers: <!--PAGE_BREAK-->
-    const strippedContent = stripSuggestMarkers(content);
-    const pages = strippedContent.split("<!--PAGE_BREAK-->");
+    const cleaned = stripSuggestMarkers(content);
+    const pages = cleaned.split("<!--PAGE_BREAK-->");
     if (pages.length > 1) {
       return (
         <>
@@ -191,7 +212,7 @@ export default function ChatBot() {
     return (
       <>
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
-          <ReactMarkdown>{strippedContent}</ReactMarkdown>
+          <ReactMarkdown>{cleaned}</ReactMarkdown>
         </div>
         {renderSuggestionButtons(content)}
       </>
@@ -233,11 +254,10 @@ export default function ChatBot() {
                 예: "서울대 컴퓨터공학부" 또는 "미적분II"
               </p>
 
-              {/* 🎓 인기 학과 */}
               <div className="w-full max-w-md mb-4">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">🎓 인기 학과</p>
                 <div className="flex flex-wrap gap-2">
-                  {DEPT_SUGGESTIONS.map((s) => (
+                  {deptSuggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => send(s)}
@@ -249,11 +269,10 @@ export default function ChatBot() {
                 </div>
               </div>
 
-              {/* 📚 주요 과목 */}
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
                 <div className="flex flex-wrap gap-2">
-                  {SUBJECT_SUGGESTIONS.map((s) => (
+                  {subjectSuggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => send(s)}
@@ -331,7 +350,15 @@ export default function ChatBot() {
 }
 
 /* ── Checkbox Message Component ── */
-function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (selected: string[]) => void }) {
+function CheckboxMessage({
+  content,
+  onSubmit,
+  renderSuggestions,
+}: {
+  content: string;
+  onSubmit: (selected: string[]) => void;
+  renderSuggestions: () => React.ReactNode;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
 
@@ -342,8 +369,7 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
   let phase: "before" | "checkbox" | "after" = "before";
 
   for (const line of lines) {
-    // Match both "- [ ] text" and "[ ] text"
-    const match = line.match(/^-?\s*\[ \] (.+)$/);
+    const match = line.match(/^\s*-?\s*\[[ ]\]\s+(.+)$/);
     if (match) {
       phase = "checkbox";
       checkboxItems.push(match[1]);
@@ -359,9 +385,12 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
     }
   }
 
+  // Strip SUGGEST markers from after-lines text
+  const afterText = stripSuggestMarkers(afterLines.join("\n"));
+
   const toggle = (item: string) => {
     if (submitted) return;
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(item)) next.delete(item);
       else next.add(item);
@@ -379,7 +408,7 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
     <div>
       {beforeLines.length > 0 && (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mb-3">
-          <ReactMarkdown>{beforeLines.join("\n")}</ReactMarkdown>
+          <ReactMarkdown>{stripSuggestMarkers(beforeLines.join("\n"))}</ReactMarkdown>
         </div>
       )}
       <div className="space-y-2 my-3">
@@ -393,9 +422,11 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
             } ${submitted ? "opacity-70 cursor-default" : ""}`}
             onClick={() => toggle(item)}
           >
-            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-              selected.has(item) ? "bg-primary border-primary" : "border-muted-foreground/30"
-            }`}>
+            <div
+              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                selected.has(item) ? "bg-primary border-primary" : "border-muted-foreground/30"
+              }`}
+            >
               {selected.has(item) && (
                 <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -415,11 +446,12 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
           선택한 학과 정보 보기 ({selected.size}개)
         </button>
       )}
-      {afterLines.length > 0 && (
+      {afterText.trim() && (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mt-3">
-          <ReactMarkdown>{afterLines.join("\n")}</ReactMarkdown>
+          <ReactMarkdown>{afterText}</ReactMarkdown>
         </div>
       )}
+      {renderSuggestions()}
     </div>
   );
 }
@@ -427,7 +459,7 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
 /* ── Paginated Message Component ── */
 function PaginatedMessage({ pages }: { pages: string[] }) {
   const [currentPage, setCurrentPage] = useState(0);
-  const filteredPages = pages.filter(p => p.trim());
+  const filteredPages = pages.filter((p) => p.trim());
 
   return (
     <div>
@@ -437,7 +469,7 @@ function PaginatedMessage({ pages }: { pages: string[] }) {
       {filteredPages.length > 1 && (
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
           <button
-            onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+            onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
             disabled={currentPage === 0}
             className="px-4 py-2 rounded-xl text-sm font-medium bg-secondary text-secondary-foreground disabled:opacity-30 hover:bg-muted transition-colors"
           >
@@ -447,7 +479,7 @@ function PaginatedMessage({ pages }: { pages: string[] }) {
             {currentPage + 1} / {filteredPages.length}
           </span>
           <button
-            onClick={() => setCurrentPage(p => Math.min(filteredPages.length - 1, p + 1))}
+            onClick={() => setCurrentPage((p) => Math.min(filteredPages.length - 1, p + 1))}
             disabled={currentPage === filteredPages.length - 1}
             className="px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground disabled:opacity-30 hover:opacity-90 transition-opacity"
           >
