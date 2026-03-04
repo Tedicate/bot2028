@@ -349,46 +349,134 @@ serve(async (req) => {
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     // Convert messages to Gemini format
-    const geminiContents = [];
-    
-    // Add system instruction separately
-    const systemInstruction = { parts: [{ text: SYSTEM_PROMPT }] };
-    
-    for (const msg of messages) {
-      geminiContents.push({
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      });
-    }
+    const geminiContents = messages.map((msg: { role: string; content: string }) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
-      {
+    const systemInstruction = { parts: [{ text: SYSTEM_PROMPT }] };
+
+    const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+    const nonStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const requestBody = {
+      system_instruction: systemInstruction,
+      contents: geminiContents,
+      generationConfig: { temperature: 0.7 },
+    };
+
+    const fallbackToLovableGateway = async () => {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "현재 AI 요청이 많습니다. 잠시 후 다시 시도해주세요." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const fallbackResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...messages,
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!fallbackResp.ok) {
+        const fallbackText = await fallbackResp.text();
+        console.error("Lovable AI fallback error:", fallbackResp.status, fallbackText);
+
+        if (fallbackResp.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "AI 사용 크레딧이 부족합니다. 크레딧을 충전한 후 다시 시도해주세요." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (fallbackResp.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "AI 요청이 많아 일시적으로 지연되고 있습니다. 잠시 후 다시 시도해주세요." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ error: "AI 서비스 호출에 실패했습니다. 잠시 후 다시 시도해주세요." }),
+          { status: fallbackResp.status || 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(fallbackResp.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    };
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // 1) Try streaming first, with lightweight retry on 429
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(streamUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: systemInstruction,
-          contents: geminiContents,
-          generationConfig: {
-            temperature: 0.7,
-          },
-        }),
-      }
-    );
+        body: JSON.stringify(requestBody),
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (response.ok) break;
+      if (response.status !== 429) break;
+      if (attempt < 2) await sleep(800 * (attempt + 1));
+    }
+
+    // 2) If streaming is still rate-limited, fallback to non-stream request
+    if (response && !response.ok && response.status === 429) {
+      const fallback = await fetch(nonStreamUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (fallback.ok) {
+        const data = await fallback.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+        const oneShotSse = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`;
+        return new Response(oneShotSse, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
         });
       }
-      const t = await response.text();
-      console.error("Gemini API error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI 서비스에 문제가 발생했습니다." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+      const fallbackErrText = await fallback.text();
+      console.error("Gemini fallback error:", fallback.status, fallbackErrText);
+      return await fallbackToLovableGateway();
+    }
+
+    if (!response || !response.ok) {
+      const providerErrorText = response ? await response.text() : "No response";
+      console.error("Gemini API error:", response?.status, providerErrorText);
+
+      if (response?.status === 400 && providerErrorText.includes("API key expired")) {
+        return new Response(
+          JSON.stringify({ error: "Gemini API 키가 만료되었거나 유효하지 않습니다. 키를 다시 발급해 교체해주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (response?.status === 429) {
+        return await fallbackToLovableGateway();
+      }
+
+      return new Response(
+        JSON.stringify({ error: "AI 서비스 호출 중 오류가 발생했습니다." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Transform Gemini SSE stream to OpenAI-compatible SSE stream
@@ -413,21 +501,23 @@ serve(async (req) => {
             buffer = buffer.slice(newlineIdx + 1);
             if (line.endsWith("\r")) line = line.slice(0, -1);
             if (!line.startsWith("data: ")) continue;
+
             const jsonStr = line.slice(6).trim();
             if (!jsonStr) continue;
+
             try {
               const parsed = JSON.parse(jsonStr);
               const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
               if (text) {
-                // Convert to OpenAI-compatible format
-                const openaiChunk = {
-                  choices: [{ delta: { content: text } }],
-                };
+                const openaiChunk = { choices: [{ delta: { content: text } }] };
                 await writer.write(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
               }
-            } catch { /* skip invalid JSON */ }
+            } catch {
+              // ignore partial/invalid lines
+            }
           }
         }
+
         await writer.write(encoder.encode("data: [DONE]\n\n"));
       } catch (e) {
         console.error("Stream transform error:", e);
