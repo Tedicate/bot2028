@@ -214,7 +214,7 @@ export default function ChatBot() {
 
     return (
       <>
-        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
+        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary prose-p:my-3 prose-li:my-1.5 prose-headings:mt-5 prose-headings:mb-3 prose-hr:my-4 prose-ul:my-2">
           <ReactMarkdown>{cleaned}</ReactMarkdown>
         </div>
         {renderSuggestionButtons(content)}
@@ -476,7 +476,7 @@ function PaginatedMessage({ pages }: { pages: string[] }) {
 
   return (
     <div>
-      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
+      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary prose-p:my-3 prose-li:my-1.5 prose-headings:mt-5 prose-headings:mb-3 prose-hr:my-4 prose-ul:my-2">
         <ReactMarkdown>{filteredPages[currentPage]}</ReactMarkdown>
       </div>
       {filteredPages.length > 1 && (
