@@ -8,15 +8,26 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/course-advisor`;
 
-const SUGGESTIONS = [
-  "기계공학과",
-  "컴퓨터공학과",
-  "의예과",
-  "경영학과",
-  "간호학과",
-  "반도체공학과",
-  "생명과학과",
-  "건축학과",
+const DEPT_SUGGESTIONS = [
+  "서울대 컴퓨터공학부",
+  "연세대 경영학과",
+  "고려대 전기전자공학부",
+  "성균관대 의예과",
+  "한양대 기계공학부",
+  "경희대 간호학과",
+  "서울시립대 도시공학과",
+  "중앙대 약학부",
+];
+
+const SUBJECT_SUGGESTIONS = [
+  "미적분II",
+  "기하",
+  "역학과 에너지",
+  "물질과 에너지",
+  "정보",
+  "인공지능 기초",
+  "데이터 과학",
+  "생명과학과 지구시스템",
 ];
 
 export default function ChatBot() {
@@ -124,10 +135,38 @@ export default function ChatBot() {
     setIsLoading(false);
   };
 
+  // Parse <!--SUGGEST:xxx--> markers and render as buttons
+  const renderSuggestionButtons = (content: string) => {
+    const suggestPattern = /<!--SUGGEST:(.+?)-->/g;
+    const suggestions: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = suggestPattern.exec(content)) !== null) {
+      suggestions.push(match[1]);
+    }
+    if (suggestions.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-2 mt-3">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            onClick={() => send(s)}
+            className="px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const stripSuggestMarkers = (content: string) => {
+    return content.replace(/<!--SUGGEST:.+?-->/g, "").trimEnd();
+  };
+
   // Parse assistant messages for interactive elements
-  const renderAssistantContent = (content: string, msgIndex: number) => {
-    // Check for checkbox-style department list: lines like "- [ ] 학과명"
-    const checkboxPattern = /^- \[ \] (.+)$/gm;
+  const renderAssistantContent = (content: string, _msgIndex: number) => {
+    // Check for checkbox-style department list: lines like "- [ ] 학과명" or "[ ] 학과명"
+    const checkboxPattern = /^-?\s*\[ \] .+$/m;
     const hasCheckboxes = checkboxPattern.test(content);
 
     if (hasCheckboxes) {
@@ -138,15 +177,24 @@ export default function ChatBot() {
     }
 
     // Check for pagination markers: <!--PAGE_BREAK-->
-    const pages = content.split("<!--PAGE_BREAK-->");
+    const strippedContent = stripSuggestMarkers(content);
+    const pages = strippedContent.split("<!--PAGE_BREAK-->");
     if (pages.length > 1) {
-      return <PaginatedMessage pages={pages} />;
+      return (
+        <>
+          <PaginatedMessage pages={pages} />
+          {renderSuggestionButtons(content)}
+        </>
+      );
     }
 
     return (
-      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
-        <ReactMarkdown>{content}</ReactMarkdown>
-      </div>
+      <>
+        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
+          <ReactMarkdown>{strippedContent}</ReactMarkdown>
+        </div>
+        {renderSuggestionButtons(content)}
+      </>
     );
   };
 
@@ -181,19 +229,40 @@ export default function ChatBot() {
                 <strong className="text-foreground">관심 학과</strong>를 입력하면 대학별 권장 이수 과목을,<br />
                 <strong className="text-foreground">과목명</strong>을 입력하면 과목 설명을 알려드려요.
               </p>
-              <p className="text-xs text-muted-foreground mb-6">
-                예: "기계공학과" 또는 "미적분II"
+              <p className="text-xs text-muted-foreground mb-5">
+                예: "서울대 컴퓨터공학부" 또는 "미적분II"
               </p>
-              <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
+
+              {/* 🎓 인기 학과 */}
+              <div className="w-full max-w-md mb-4">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">🎓 인기 학과</p>
+                <div className="flex flex-wrap gap-2">
+                  {DEPT_SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => send(s)}
+                      className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 📚 주요 과목 */}
+              <div className="w-full max-w-md">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
+                <div className="flex flex-wrap gap-2">
+                  {SUBJECT_SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => send(s)}
+                      className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}
@@ -266,7 +335,6 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
 
-  // Split content into parts: before checkboxes, checkbox items, after checkboxes
   const lines = content.split("\n");
   const beforeLines: string[] = [];
   const checkboxItems: string[] = [];
@@ -274,13 +342,14 @@ function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (se
   let phase: "before" | "checkbox" | "after" = "before";
 
   for (const line of lines) {
-    const match = line.match(/^- \[ \] (.+)$/);
+    // Match both "- [ ] text" and "[ ] text"
+    const match = line.match(/^-?\s*\[ \] (.+)$/);
     if (match) {
       phase = "checkbox";
       checkboxItems.push(match[1]);
     } else if (phase === "checkbox" && line.trim() === "") {
       // still in checkbox area
-    } else if (phase === "checkbox" && !line.match(/^- \[ \]/)) {
+    } else if (phase === "checkbox") {
       phase = "after";
       afterLines.push(line);
     } else if (phase === "after") {
