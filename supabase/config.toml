@@ -2,3 +2,6 @@ project_id = "zpvsqwgndrivaseenkxa"
 
 [functions.course-advisor]
 verify_jwt = false
+
+[functions.seed-data]
+verify_jwt = false

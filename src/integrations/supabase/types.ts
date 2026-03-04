@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      university_courses: {
+        Row: {
+          area: string
+          college: string | null
+          core_subjects: string | null
+          department: string | null
+          id: string
+          notes: string | null
+          recommended_subjects: string | null
+          region: string
+          university: string
+        }
+        Insert: {
+          area?: string
+          college?: string | null
+          core_subjects?: string | null
+          department?: string | null
+          id?: string
+          notes?: string | null
+          recommended_subjects?: string | null
+          region?: string
+          university?: string
+        }
+        Update: {
+          area?: string
+          college?: string | null
+          core_subjects?: string | null
+          department?: string | null
+          id?: string
+          notes?: string | null
+          recommended_subjects?: string | null
+          region?: string
+          university?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
