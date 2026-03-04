@@ -309,7 +309,7 @@ export default function ChatBot() {
                       href="https://www.kyobit.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1 rounded-full text-[11px] text-muted-foreground/60 border border-border/40 hover:text-muted-foreground hover:border-border transition-colors"
+                      className="px-3 py-1 rounded-full text-[11px] text-muted-foreground bg-background border border-border shadow-sm hover:text-foreground hover:border-border/80 transition-colors"
                     >
                       교육을 비추다
                     </a>
