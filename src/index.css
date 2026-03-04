@@ -118,3 +118,51 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.3);
 }
+
+/* Beautiful markdown table styling */
+.prose table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  margin: 0.75rem 0;
+  font-size: 0.8125rem;
+}
+
+.prose thead {
+  background: hsl(var(--primary) / 0.08);
+}
+
+.prose th {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: hsl(var(--primary));
+  border-bottom: 1.5px solid hsl(var(--primary) / 0.2);
+  white-space: nowrap;
+}
+
+.prose td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  line-height: 1.5;
+}
+
+.prose tr:last-child td {
+  border-bottom: none;
+}
+
+.prose tbody tr:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.prose tbody tr:nth-child(even) {
+  background: hsl(var(--muted) / 0.3);
+}
+
+.prose tbody tr:nth-child(even):hover {
+  background: hsl(var(--muted) / 0.6);
+}

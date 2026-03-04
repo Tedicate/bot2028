@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import logo from "@/assets/logo.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -23,7 +24,6 @@ export default function ChatBot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -101,7 +101,6 @@ export default function ChatBot() {
         }
       }
 
-      // flush remaining
       if (textBuffer.trim()) {
         for (let raw of textBuffer.split("\n")) {
           if (!raw) continue;
@@ -125,6 +124,32 @@ export default function ChatBot() {
     setIsLoading(false);
   };
 
+  // Parse assistant messages for interactive elements
+  const renderAssistantContent = (content: string, msgIndex: number) => {
+    // Check for checkbox-style department list: lines like "- [ ] 학과명"
+    const checkboxPattern = /^- \[ \] (.+)$/gm;
+    const hasCheckboxes = checkboxPattern.test(content);
+
+    if (hasCheckboxes) {
+      return <CheckboxMessage content={content} onSubmit={(selected) => {
+        const selectedText = selected.join(", ");
+        send(`다음 학과들의 상세 정보를 보여주세요: ${selectedText}`);
+      }} />;
+    }
+
+    // Check for pagination markers: <!--PAGE_BREAK-->
+    const pages = content.split("<!--PAGE_BREAK-->");
+    if (pages.length > 1) {
+      return <PaginatedMessage pages={pages} />;
+    }
+
+    return (
+      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
+    );
+  };
+
   const showWelcome = messages.length === 0;
 
   return (
@@ -132,12 +157,10 @@ export default function ChatBot() {
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-lg font-bold">📚</span>
-          </div>
+          <img src={logo} alt="교육을 비추다" className="w-10 h-10 rounded-2xl object-contain" />
           <div>
-            <h1 className="text-lg font-bold text-foreground">선택과목 안내</h1>
-            <p className="text-xs text-muted-foreground">2028 대입 전공연계 과목 추천</p>
+            <h1 className="text-lg font-bold text-foreground">2028 교빛 봇</h1>
+            <p className="text-xs text-muted-foreground">전공연계 과목 추천 · 과목 안내</p>
           </div>
         </div>
       </header>
@@ -150,15 +173,16 @@ export default function ChatBot() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col items-center justify-center pt-12 pb-8"
+              className="flex flex-col items-center justify-center pt-8 pb-6"
             >
-              <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-5">
-                <span className="text-3xl">🎓</span>
-              </div>
-              <h2 className="text-xl font-bold text-foreground mb-2">어떤 학과에 관심이 있나요?</h2>
-              <p className="text-sm text-muted-foreground text-center mb-8 max-w-sm leading-relaxed">
-                관심 학과를 입력하면, 여러 대학의 유사 학과와<br />
-                권장 이수 과목을 한눈에 알려드려요.
+              <img src={logo} alt="교육을 비추다" className="w-20 h-20 rounded-3xl object-contain mb-5" />
+              <h2 className="text-xl font-bold text-foreground mb-2">무엇이 궁금하신가요?</h2>
+              <p className="text-sm text-muted-foreground text-center mb-3 max-w-sm leading-relaxed">
+                <strong className="text-foreground">관심 학과</strong>를 입력하면 대학별 권장 이수 과목을,<br />
+                <strong className="text-foreground">과목명</strong>을 입력하면 과목 설명을 알려드려요.
+              </p>
+              <p className="text-xs text-muted-foreground mb-6">
+                예: "기계공학과" 또는 "미적분II"
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-md">
                 {SUGGESTIONS.map((s) => (
@@ -187,21 +211,15 @@ export default function ChatBot() {
                   {msg.content}
                 </div>
               ) : (
-                <div className="max-w-[90%] px-4 py-3 rounded-2xl rounded-bl-md bg-chat-bot text-chat-bot-foreground text-sm leading-relaxed">
-                  <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
+                <div className="max-w-[95%] w-full px-4 py-3 rounded-2xl rounded-bl-md bg-chat-bot text-chat-bot-foreground text-sm leading-relaxed">
+                  {renderAssistantContent(msg.content, i)}
                 </div>
               )}
             </motion.div>
           ))}
 
           {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-start"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
               <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-chat-bot">
                 <div className="flex gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -221,10 +239,9 @@ export default function ChatBot() {
           className="flex items-center gap-3 bg-secondary rounded-2xl px-4 py-2"
         >
           <input
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="관심 학과를 입력해보세요"
+            placeholder="학과명 또는 과목명을 입력하세요"
             disabled={isLoading}
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
           />
@@ -240,6 +257,135 @@ export default function ChatBot() {
           2028학년도 대입 기준 · 대학별 시행계획에 따라 변동될 수 있습니다
         </p>
       </div>
+    </div>
+  );
+}
+
+/* ── Checkbox Message Component ── */
+function CheckboxMessage({ content, onSubmit }: { content: string; onSubmit: (selected: string[]) => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
+
+  // Split content into parts: before checkboxes, checkbox items, after checkboxes
+  const lines = content.split("\n");
+  const beforeLines: string[] = [];
+  const checkboxItems: string[] = [];
+  const afterLines: string[] = [];
+  let phase: "before" | "checkbox" | "after" = "before";
+
+  for (const line of lines) {
+    const match = line.match(/^- \[ \] (.+)$/);
+    if (match) {
+      phase = "checkbox";
+      checkboxItems.push(match[1]);
+    } else if (phase === "checkbox" && line.trim() === "") {
+      // still in checkbox area
+    } else if (phase === "checkbox" && !line.match(/^- \[ \]/)) {
+      phase = "after";
+      afterLines.push(line);
+    } else if (phase === "after") {
+      afterLines.push(line);
+    } else {
+      beforeLines.push(line);
+    }
+  }
+
+  const toggle = (item: string) => {
+    if (submitted) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(item)) next.delete(item);
+      else next.add(item);
+      return next;
+    });
+  };
+
+  const handleSubmit = () => {
+    if (selected.size === 0) return;
+    setSubmitted(true);
+    onSubmit(Array.from(selected));
+  };
+
+  return (
+    <div>
+      {beforeLines.length > 0 && (
+        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mb-3">
+          <ReactMarkdown>{beforeLines.join("\n")}</ReactMarkdown>
+        </div>
+      )}
+      <div className="space-y-2 my-3">
+        {checkboxItems.map((item) => (
+          <label
+            key={item}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${
+              selected.has(item)
+                ? "bg-primary/10 border-primary/30 text-foreground"
+                : "bg-background border-border hover:bg-muted"
+            } ${submitted ? "opacity-70 cursor-default" : ""}`}
+            onClick={() => toggle(item)}
+          >
+            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+              selected.has(item) ? "bg-primary border-primary" : "border-muted-foreground/30"
+            }`}>
+              {selected.has(item) && (
+                <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-medium">{item}</span>
+          </label>
+        ))}
+      </div>
+      {!submitted && (
+        <button
+          onClick={handleSubmit}
+          disabled={selected.size === 0}
+          className="mt-2 w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-30 transition-opacity hover:opacity-90"
+        >
+          선택한 학과 정보 보기 ({selected.size}개)
+        </button>
+      )}
+      {afterLines.length > 0 && (
+        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mt-3">
+          <ReactMarkdown>{afterLines.join("\n")}</ReactMarkdown>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Paginated Message Component ── */
+function PaginatedMessage({ pages }: { pages: string[] }) {
+  const [currentPage, setCurrentPage] = useState(0);
+  const filteredPages = pages.filter(p => p.trim());
+
+  return (
+    <div>
+      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary">
+        <ReactMarkdown>{filteredPages[currentPage]}</ReactMarkdown>
+      </div>
+      {filteredPages.length > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+            disabled={currentPage === 0}
+            className="px-4 py-2 rounded-xl text-sm font-medium bg-secondary text-secondary-foreground disabled:opacity-30 hover:bg-muted transition-colors"
+          >
+            ← 이전
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {currentPage + 1} / {filteredPages.length}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(filteredPages.length - 1, p + 1))}
+            disabled={currentPage === filteredPages.length - 1}
+            className="px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground disabled:opacity-30 hover:opacity-90 transition-opacity"
+          >
+            다음 →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
