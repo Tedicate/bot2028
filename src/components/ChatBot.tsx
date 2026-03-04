@@ -9,15 +9,15 @@ type Msg = { role: "user" | "assistant"; content: string };
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/course-advisor`;
 
 const ALL_DEPT_SUGGESTIONS = [
-  "서울대 컴퓨터공학부", "연세대 경영학과", "고려대 전기전자공학부",
-  "성균관대 의예과", "한양대 기계공학부", "경희대 간호학과",
-  "서울시립대 도시공학과", "중앙대 약학부", "이화여대 국어국문학과",
-  "서강대 경제학부", "숙명여대 미디어학부", "건국대 동물자원과학과",
-  "동국대 영화영상학과", "한국외대 통번역학과", "홍익대 미술학부",
-  "서울대 법학부", "연세대 심리학과", "고려대 국어국문학과",
-  "한양대 건축학부", "경희대 호텔관광학부", "중앙대 문예창작학과",
-  "서울시립대 환경공학부", "숭실대 AI융합학부", "세종대 호텔관광경영학부",
-  "부산대 조경학과", "경북대 농업생명과학대학", "전남대 수의예과",
+  "서울대 컴퓨터공학부", "고려대 전기전자공학부", "경희대 간호학과",
+  "서울시립대 도시공학과", "중앙대 약학부", "동국대 컴퓨터·AI학부",
+  "서울대 의예과", "고려대 컴퓨터학과", "경희대 전자공학과",
+  "서울시립대 환경공학부", "숭실대 AI소프트웨어학부", "건국대 공학계열",
+  "서울대 약학과", "고려대 기계공학부", "경희대 화학공학과",
+  "중앙대 소프트웨어학부", "부산대 경영학과", "경북대 공과대학",
+  "서울시립대 경영학부", "동국대 약학과", "가톨릭대 의예과",
+  "인하대 기계공학과", "한양대 자연계열", "부산대 정보컴퓨터공학부",
+  "서울대 수의예과", "경희대 소프트웨어융합학과", "서울시립대 조경학과",
 ];
 
 const ALL_SUBJECT_SUGGESTIONS = [
@@ -38,10 +38,12 @@ function shuffleAndPick<T>(arr: T[], count: number): T[] {
 // ── Shared utilities ──
 const SUGGEST_RE = /<!--SUGGEST:(.+?)-->/g;
 
-function stripSuggestMarkers(content: string): string {
+function stripHtmlAndMarkers(content: string): string {
   return content
     .replace(SUGGEST_RE, "")
     .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?[a-z][a-z0-9]*[^>]*>/gi, "")
     .trimEnd();
 }
 
@@ -71,7 +73,9 @@ export default function ChatBot() {
   const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    if (messages.length > 0) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages]);
 
   const send = async (text: string) => {
@@ -201,7 +205,7 @@ export default function ChatBot() {
       );
     }
 
-    const cleaned = stripSuggestMarkers(content);
+    const cleaned = stripHtmlAndMarkers(content);
     const pages = cleaned.split("<!--PAGE_BREAK-->");
     if (pages.length > 1) {
       return (
@@ -349,9 +353,9 @@ export default function ChatBot() {
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90"
+            className="w-8 h-8 min-w-[2rem] min-h-[2rem] rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 shrink-0" />
           </button>
         </form>
         <p className="text-[11px] text-muted-foreground text-center mt-2">
@@ -399,7 +403,7 @@ function CheckboxMessage({
   }
 
   // Strip SUGGEST markers from after-lines text
-  const afterText = stripSuggestMarkers(afterLines.join("\n"));
+  const afterText = stripHtmlAndMarkers(afterLines.join("\n"));
 
   const toggle = (item: string) => {
     if (submitted) return;
@@ -421,7 +425,7 @@ function CheckboxMessage({
     <div>
       {beforeLines.length > 0 && (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mb-3">
-          <ReactMarkdown>{stripSuggestMarkers(beforeLines.join("\n"))}</ReactMarkdown>
+          <ReactMarkdown>{stripHtmlAndMarkers(beforeLines.join("\n"))}</ReactMarkdown>
         </div>
       )}
       <div className="space-y-2 my-3">
