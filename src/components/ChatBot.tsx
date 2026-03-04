@@ -304,6 +304,16 @@ export default function ChatBot() {
               ) : (
                 <div className="max-w-[95%] w-full px-4 py-3 rounded-2xl rounded-bl-md bg-chat-bot text-chat-bot-foreground text-sm leading-relaxed">
                   {renderAssistantContent(msg.content, i)}
+                  <div className="flex justify-end mt-2">
+                    <a
+                      href="https://www.kyobit.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 rounded-full text-[11px] text-muted-foreground/60 border border-border/40 hover:text-muted-foreground hover:border-border transition-colors"
+                    >
+                      교육을 비추다
+                    </a>
+                  </div>
                 </div>
               )}
             </motion.div>
