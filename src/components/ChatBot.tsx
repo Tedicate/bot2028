@@ -41,6 +41,17 @@ function shuffleAndPick<T>(arr: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
+function useRotatingSuggestions<T>(pool: T[], count: number, intervalMs: number): T[] {
+  const [items, setItems] = useState<T[]>(() => shuffleAndPick(pool, count));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setItems(shuffleAndPick(pool, count));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [pool, count, intervalMs]);
+  return items;
+}
+
 // ── Shared utilities ──
 const SUGGEST_RE = /<!--SUGGEST:(.+?)-->/g;
 
