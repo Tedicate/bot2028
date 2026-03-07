@@ -73,8 +73,13 @@ export default function ChatBot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
-  // Randomize suggestions once per mount
+  const goHome = () => {
+    setMessages([]);
+    setInput("");
+    navigate("/");
+  };
   const deptSuggestions = useMemo(() => shuffleAndPick(ALL_DEPT_SUGGESTIONS, 8), []);
   const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
 
