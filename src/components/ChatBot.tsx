@@ -212,8 +212,43 @@ export default function ChatBot() {
 
     return (
       <>
-        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary prose-p:my-3 prose-li:my-1.5 prose-headings:mt-5 prose-headings:mb-3 prose-hr:my-4 prose-ul:my-2">
-          <ReactMarkdown>{cleaned}</ReactMarkdown>
+        <div className="chat-markdown">
+          <ReactMarkdown
+            components={{
+              h2: ({ children }) => (
+                <h2 className="text-base font-bold text-foreground mt-5 mb-2 flex items-center gap-1">{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-sm font-bold text-foreground mt-4 mb-1.5">{children}</h3>
+              ),
+              p: ({ children }) => (
+                <p className="text-sm leading-relaxed text-chat-bot-foreground my-2">{children}</p>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-bold text-primary">{children}</strong>
+              ),
+              ul: ({ children }) => (
+                <ul className="space-y-2.5 my-3 list-none pl-0">{children}</ul>
+              ),
+              li: ({ children }) => (
+                <li className="text-sm leading-relaxed text-chat-bot-foreground pl-1 border-l-2 border-primary/20 ml-1 py-0.5 [&>p]:my-0.5">{children}</li>
+              ),
+              hr: () => <hr className="my-4 border-border" />,
+              a: ({ href, children }) => (
+                <a href={href} className="text-primary underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
+              ),
+              table: ({ children }) => (
+                <div className="overflow-x-auto my-3">
+                  <table className="w-full text-xs border-collapse rounded-lg overflow-hidden border border-border">{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => <thead className="bg-primary/8">{children}</thead>,
+              th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-primary text-xs">{children}</th>,
+              td: ({ children }) => <td className="px-3 py-1.5 border-t border-border text-xs">{children}</td>,
+            }}
+          >
+            {cleaned}
+          </ReactMarkdown>
         </div>
         {renderSuggestionButtons(content)}
       </>
