@@ -476,7 +476,7 @@ function CheckboxMessage({
   return (
     <div>
       {beforeLines.length > 0 && (
-        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mb-3">
+        <div className="chat-markdown">
           <ReactMarkdown>{stripHtmlAndMarkers(beforeLines.join("\n"))}</ReactMarkdown>
         </div>
       )}
@@ -516,7 +516,7 @@ function CheckboxMessage({
         </button>
       )}
       {afterText.trim() && (
-        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground mt-3">
+        <div className="chat-markdown mt-3">
           <ReactMarkdown>{afterText}</ReactMarkdown>
         </div>
       )}
@@ -532,7 +532,7 @@ function PaginatedMessage({ pages }: { pages: string[] }) {
 
   return (
     <div>
-      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-td:text-foreground prose-th:text-foreground prose-a:text-primary prose-p:my-3 prose-li:my-1.5 prose-headings:mt-5 prose-headings:mb-3 prose-hr:my-4 prose-ul:my-2">
+      <div className="chat-markdown">
         <ReactMarkdown>{filteredPages[currentPage]}</ReactMarkdown>
       </div>
       {filteredPages.length > 1 && (
