@@ -30,7 +30,7 @@ const ALL_SUBJECT_SUGGESTIONS = [
   "미적분II", "기하", "역학과 에너지", "물질과 에너지",
   "정보", "인공지능 기초", "데이터 과학", "생명과학과 지구시스템",
   "세계시민과 지리", "사회문화", "생활과 윤리", "정치와 법",
-  "심리학", "교육학", "보건", "음악", "미술", "체육",
+  "심리학", "교육학", "보건",
   "중국어", "일본어", "프랑스어", "확률과 통계",
   "화학반응의 세계", "생명과학실험", "지구과학실험",
   "국어", "영어", "한국사",
@@ -39,6 +39,17 @@ const ALL_SUBJECT_SUGGESTIONS = [
 function shuffleAndPick<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
+}
+
+function useRotatingSuggestions<T>(pool: T[], count: number, intervalMs: number): T[] {
+  const [items, setItems] = useState<T[]>(() => shuffleAndPick(pool, count));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setItems(shuffleAndPick(pool, count));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [pool, count, intervalMs]);
+  return items;
 }
 
 // ── Shared utilities ──
@@ -80,8 +91,8 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useMemo(() => shuffleAndPick(ALL_DEPT_SUGGESTIONS, 8), []);
-  const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
+  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, 8, 3000);
+  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 8, 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -249,31 +260,45 @@ export default function ChatBot() {
 
               <div className="w-full max-w-md mb-4">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">🎓 인기 학과</p>
-                <div className="flex flex-wrap gap-2">
-                  {deptSuggestions.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                    >
-                      {s}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-2 min-h-[88px]">
+                  <AnimatePresence mode="popLayout">
+                    {deptSuggestions.map((s) => (
+                      <motion.button
+                        key={s}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        onClick={() => send(s)}
+                        className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {s}
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
                 </div>
               </div>
 
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
-                <div className="flex flex-wrap gap-2">
-                  {subjectSuggestions.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                    >
-                      {s}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-2 min-h-[88px]">
+                  <AnimatePresence mode="popLayout">
+                    {subjectSuggestions.map((s) => (
+                      <motion.button
+                        key={s}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        onClick={() => send(s)}
+                        className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {s}
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
                 </div>
               </div>
             </motion.div>
