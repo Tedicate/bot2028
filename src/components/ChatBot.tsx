@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -72,8 +73,13 @@ export default function ChatBot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
-  // Randomize suggestions once per mount
+  const goHome = () => {
+    setMessages([]);
+    setInput("");
+    navigate("/");
+  };
   const deptSuggestions = useMemo(() => shuffleAndPick(ALL_DEPT_SUGGESTIONS, 8), []);
   const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
 
@@ -210,7 +216,7 @@ export default function ChatBot() {
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-6 pb-4 border-b border-border">
         <button
-          onClick={() => { setMessages([]); setInput(""); }}
+          onClick={goHome}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
           <img src={logo} alt="교육을 비추다" className="w-10 h-10 rounded-2xl object-contain" />
@@ -298,7 +304,7 @@ export default function ChatBot() {
                       교육을 비추다
                     </a>
                     <button
-                      onClick={() => { setMessages([]); setInput(""); }}
+                      onClick={goHome}
                       className="px-3 py-1 rounded-full text-[11px] text-muted-foreground bg-background border border-border shadow-sm hover:text-foreground hover:border-border/80 transition-colors"
                     >
                       메인으로
