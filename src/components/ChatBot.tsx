@@ -216,7 +216,7 @@ export default function ChatBot() {
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-6 pb-4 border-b border-border">
         <button
-          onClick={() => { setMessages([]); setInput(""); }}
+          onClick={goHome}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
           <img src={logo} alt="교육을 비추다" className="w-10 h-10 rounded-2xl object-contain" />
@@ -304,7 +304,7 @@ export default function ChatBot() {
                       교육을 비추다
                     </a>
                     <button
-                      onClick={() => { setMessages([]); setInput(""); }}
+                      onClick={goHome}
                       className="px-3 py-1 rounded-full text-[11px] text-muted-foreground bg-background border border-border shadow-sm hover:text-foreground hover:border-border/80 transition-colors"
                     >
                       메인으로
