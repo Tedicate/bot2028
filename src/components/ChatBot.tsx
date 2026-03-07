@@ -91,8 +91,8 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useMemo(() => shuffleAndPick(ALL_DEPT_SUGGESTIONS, 8), []);
-  const subjectSuggestions = useMemo(() => shuffleAndPick(ALL_SUBJECT_SUGGESTIONS, 8), []);
+  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, 8, 3000);
+  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 8, 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
