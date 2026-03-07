@@ -4,9 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import logo from "@/assets/logo.png";
 
+import { supabase } from "@/integrations/supabase/client";
+
 type Msg = { role: "user" | "assistant"; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/course-advisor`;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+const EMBED_URL = `${SUPABASE_URL}/functions/v1/gemini-embed`;
+const CHAT_URL = `${SUPABASE_URL}/functions/v1/gemini-chat`;
 
 const ALL_DEPT_SUGGESTIONS = [
   "서울대 컴퓨터공학부", "고려대 전기전자공학부", "경희대 간호학과",
@@ -88,86 +93,58 @@ export default function ChatBot() {
     setInput("");
     setIsLoading(true);
 
-    let assistantSoFar = "";
-
-    const upsertAssistant = (chunk: string) => {
-      assistantSoFar += chunk;
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
-        }
-        return [...prev, { role: "assistant", content: assistantSoFar }];
-      });
+    const addAssistantMessage = (text: string) => {
+      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
     };
 
     try {
-      const resp = await fetch(CHAT_URL, {
+      // Step 1: Embed the user's question
+      const embedResp = await fetch(EMBED_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: newMessages }),
+        headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
+        body: JSON.stringify({ text: trimmed, taskType: "RETRIEVAL_QUERY" }),
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "오류가 발생했습니다." }));
-        upsertAssistant(`⚠️ ${err.error || "오류가 발생했습니다."}`);
+      if (!embedResp.ok) {
+        addAssistantMessage("⚠️ 질문 처리 중 오류가 발생했습니다.");
         setIsLoading(false);
         return;
       }
 
-      if (!resp.body) throw new Error("No stream body");
+      const { embedding } = await embedResp.json();
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
+      // Step 2: Search similar documents
+      const { data: matches, error: matchError } = await supabase.rpc("match_documents", {
+        query_embedding: embedding,
+        match_threshold: 0.5,
+        match_count: 5,
+      } as any);
 
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
+      const contexts: string[] = (matches || []).map((m: any) => m.content);
 
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") { streamDone = true; break; }
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
+      // Step 3: Generate answer via gemini-chat
+      const chatResp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
+        body: JSON.stringify({
+          question: trimmed,
+          contexts,
+          messages: newMessages.slice(0, -1), // previous history
+        }),
+      });
+
+      if (!chatResp.ok) {
+        const err = await chatResp.json().catch(() => ({ error: "오류가 발생했습니다." }));
+        addAssistantMessage(`⚠️ ${err.error || "오류가 발생했습니다."}`);
+        setIsLoading(false);
+        return;
       }
 
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (raw.startsWith(":") || raw.trim() === "") continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch { /* ignore */ }
-        }
-      }
+      const { answer } = await chatResp.json();
+      addAssistantMessage(answer || "답변을 생성할 수 없습니다.");
     } catch (e) {
       console.error(e);
-      upsertAssistant("⚠️ 네트워크 오류가 발생했습니다. 다시 시도해주세요.");
+      addAssistantMessage("⚠️ 네트워크 오류가 발생했습니다. 다시 시도해주세요.");
     }
 
     setIsLoading(false);
