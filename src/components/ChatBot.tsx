@@ -96,7 +96,10 @@ export default function ChatBot() {
 
   useEffect(() => {
     if (messages.length > 0) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "user") {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      }
     }
   }, [messages]);
 
