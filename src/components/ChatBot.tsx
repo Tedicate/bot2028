@@ -209,13 +209,16 @@ export default function ChatBot() {
     <div className="flex flex-col h-screen max-w-2xl mx-auto bg-background">
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-6 pb-4 border-b border-border">
-        <div className="flex items-center gap-3">
+        <button
+          onClick={() => { setMessages([]); setInput(""); }}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
           <img src={logo} alt="교육을 비추다" className="w-10 h-10 rounded-2xl object-contain" />
-          <div>
+          <div className="text-left">
             <h1 className="text-lg font-bold text-foreground">2028 교빛 봇</h1>
             <p className="text-xs text-muted-foreground">전공연계 과목 추천 · 과목 안내</p>
           </div>
-        </div>
+        </button>
       </header>
 
       {/* Messages */}
