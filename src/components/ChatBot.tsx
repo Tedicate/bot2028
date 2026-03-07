@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
 import { supabase } from "@/integrations/supabase/client";
