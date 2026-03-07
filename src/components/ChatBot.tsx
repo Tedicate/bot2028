@@ -285,7 +285,7 @@ export default function ChatBot() {
               ) : (
                 <div className="max-w-[95%] w-full px-4 py-3 rounded-2xl rounded-bl-md bg-chat-bot text-chat-bot-foreground text-sm leading-relaxed">
                   {renderAssistantContent(msg.content, i)}
-                  <div className="flex justify-end mt-2">
+                  <div className="flex justify-end gap-2 mt-2">
                     <a
                       href="https://www.kyobit.com"
                       target="_blank"
@@ -294,6 +294,12 @@ export default function ChatBot() {
                     >
                       교육을 비추다
                     </a>
+                    <button
+                      onClick={() => { setMessages([]); setInput(""); }}
+                      className="px-3 py-1 rounded-full text-[11px] text-muted-foreground bg-background border border-border shadow-sm hover:text-foreground hover:border-border/80 transition-colors"
+                    >
+                      메인으로
+                    </button>
                   </div>
                 </div>
               )}
