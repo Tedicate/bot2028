@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -10,14 +11,6 @@ type Msg = { role: "user" | "assistant"; content: string };
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 const ADVISOR_URL = `${SUPABASE_URL}/functions/v1/course-advisor`;
-
-const ALL_DEPT_SUGGESTIONS = [
-  "경희대 간호학과", "경희대 컴퓨터공학과", "고려대 기계공학부",
-];
-
-const ALL_ADMISSION_SUGGESTIONS = [
-  "2028 서울대", "2028 경희대", "2028 건국대",
-];
 
 const ALL_SUBJECT_SUGGESTIONS = [
   "미적분II", "기하", "확률과 통계", "물리학", "화학",
@@ -33,6 +26,8 @@ function shuffleAndPick<T>(arr: T[], count: number): T[] {
 function useRotatingSuggestions<T>(pool: T[], count: number, intervalMs: number): T[] {
   const [items, setItems] = useState<T[]>(() => shuffleAndPick(pool, count));
   useEffect(() => {
+    if (pool.length === 0) return;
+    setItems(shuffleAndPick(pool, count));
     const timer = setInterval(() => {
       setItems(shuffleAndPick(pool, count));
     }, intervalMs);
@@ -68,6 +63,66 @@ function hasCheckboxLines(content: string): boolean {
   return content.split("\n").some((line) => CHECKBOX_LINE_RE.test(line));
 }
 
+// ── Dynamic data hooks ──
+function useDynamicDeptSuggestions(): string[] {
+  const [pool, setPool] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      // Get top 6 universities by department count
+      const { data } = await supabase
+        .from("university_subjects")
+        .select("university, department");
+      if (!data || data.length === 0) return;
+
+      // Count departments per university (unique)
+      const uniDepts: Record<string, Set<string>> = {};
+      for (const row of data) {
+        if (!uniDepts[row.university]) uniDepts[row.university] = new Set();
+        uniDepts[row.university].add(row.department);
+      }
+
+      // Sort by department count descending, take top 6
+      const sorted = Object.entries(uniDepts)
+        .sort((a, b) => b[1].size - a[1].size)
+        .slice(0, 6);
+
+      // For each university, pick a representative department
+      const suggestions = sorted.map(([uni, depts]) => {
+        const deptArr = Array.from(depts);
+        const dept = deptArr[Math.floor(Math.random() * deptArr.length)];
+        // Strip "대학교" suffix for display
+        const shortUni = uni.replace(/대학교$/, "대");
+        return `${shortUni} ${dept}`;
+      });
+
+      setPool(suggestions);
+    })();
+  }, []);
+  return pool;
+}
+
+function useDynamicAdmissionSuggestions(): string[] {
+  const [pool, setPool] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("admission_plans")
+        .select("university");
+      if (!data || data.length === 0) return;
+
+      // Unique universities
+      const unis = [...new Set(data.map((r) => r.university))];
+      const suggestions = unis.map((uni) => {
+        const shortUni = uni.replace(/대학교$/, "대");
+        return `2028 ${shortUni}`;
+      });
+
+      setPool(suggestions);
+    })();
+  }, []);
+  return pool;
+}
+
 export default function ChatBot() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -75,14 +130,17 @@ export default function ChatBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  const deptPool = useDynamicDeptSuggestions();
+  const admissionPool = useDynamicAdmissionSuggestions();
+
   const goHome = () => {
     setMessages([]);
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, Math.min(3, ALL_DEPT_SUGGESTIONS.length), 3000);
-  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, Math.min(4, ALL_SUBJECT_SUGGESTIONS.length), 3000);
-  const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, Math.min(3, ALL_ADMISSION_SUGGESTIONS.length), 3000);
+  const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(4, Math.max(1, deptPool.length)), 3000);
+  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 6, 3000);
+  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(3, Math.max(1, admissionPool.length)), 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
