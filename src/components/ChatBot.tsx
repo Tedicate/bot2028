@@ -80,8 +80,8 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, Math.min(6, ALL_DEPT_SUGGESTIONS.length), 3000);
-  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, Math.min(6, ALL_SUBJECT_SUGGESTIONS.length), 3000);
+  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, Math.min(3, ALL_DEPT_SUGGESTIONS.length), 3000);
+  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, Math.min(4, ALL_SUBJECT_SUGGESTIONS.length), 3000);
   const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, Math.min(3, ALL_ADMISSION_SUGGESTIONS.length), 3000);
 
   useEffect(() => {
