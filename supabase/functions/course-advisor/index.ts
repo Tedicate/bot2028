@@ -204,21 +204,40 @@ ${COURSE_DESCRIPTIONS}
 
 // Extract university and department keywords from question text
 function extractKeywords(question: string): { universityKeyword: string; departmentKeyword: string } {
+  // Known university name stems (without 대/대학/대학교 suffix)
+  const KNOWN_UNIVERSITIES = [
+    "서울", "고려", "연세", "경희", "중앙", "한양", "성균관", "서강", "이화",
+    "숙명", "동국", "건국", "홍익", "국민", "숭실", "세종", "광운", "명지",
+    "상명", "가톨릭", "서울시립", "인하", "아주", "부산", "경북", "전남",
+    "충남", "충북", "전북", "강원", "제주", "울산", "경상", "한국외국어",
+    "한국항공", "서울과학기술", "한국교통", "단국", "가천", "덕성",
+  ];
+
   const words = question.split(/\s+/).filter(w => w.length >= 2);
   let universityKeyword = "";
   const departmentCandidates: string[] = [];
 
   for (const word of words) {
-    if (/대학교|대학|대$|대학?교?/.test(word)) {
+    if (/대학교|대학|대$/.test(word)) {
       // Strip university suffixes for broader matching
       universityKeyword = word.replace(/(대학교|대학|대)$/g, "").trim() || word;
     } else if (/학과|학부|계열|전공|예과|과$/.test(word)) {
       const stripped = word.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
       if (stripped) departmentCandidates.push(stripped);
     } else if (!/권장|추천|과목|알려|어떤|정보|보여|상세/.test(word)) {
-      // Unrecognized words → treat as department keyword candidates
-      departmentCandidates.push(word);
+      // Check if this word is a known university name without suffix
+      if (!universityKeyword && KNOWN_UNIVERSITIES.some(u => word.includes(u) || u.includes(word))) {
+        universityKeyword = word;
+      } else {
+        departmentCandidates.push(word);
+      }
     }
+  }
+
+  // If still no university but we have 2+ candidates, heuristic: first might be university
+  if (!universityKeyword && departmentCandidates.length >= 2) {
+    const first = departmentCandidates.shift()!;
+    universityKeyword = first;
   }
 
   const departmentKeyword = departmentCandidates[0] || "";
@@ -254,16 +273,27 @@ async function querySubjectRecommendations(supabase: any, question: string) {
 
     if (data && data.length > 0) return data;
 
-    // Fallback: university only
-    const { data: fallbackData, error: fallbackError } = await supabase
+    // Fallback 1: department only (show same department at other universities)
+    const { data: deptData, error: deptError } = await supabase
+      .from('university_subjects')
+      .select('university, department, subject, is_core, is_recommended, year')
+      .ilike('department', `%${departmentKeyword}%`)
+      .limit(100);
+
+    if (deptError) console.error('학과 폴백 쿼리 에러:', deptError);
+    console.log('학과 폴백 결과:', deptData?.length ?? 0, '행');
+    if (deptData && deptData.length > 0) return deptData;
+
+    // Fallback 2: university only (show other departments at same university)
+    const { data: uniData, error: uniError } = await supabase
       .from('university_subjects')
       .select('university, department, subject, is_core, is_recommended, year')
       .ilike('university', `%${universityKeyword}%`)
       .limit(30);
 
-    if (fallbackError) console.error('폴백 쿼리 에러:', fallbackError);
-    console.log('폴백 결과:', fallbackData?.length ?? 0, '행');
-    return fallbackData && fallbackData.length > 0 ? fallbackData : null;
+    if (uniError) console.error('대학 폴백 쿼리 에러:', uniError);
+    console.log('대학 폴백 결과:', uniData?.length ?? 0, '행');
+    return uniData && uniData.length > 0 ? uniData : null;
   }
 
   // University only or department only
