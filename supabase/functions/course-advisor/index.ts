@@ -233,9 +233,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     console.log('키워드 없음, 전체 질문으로 검색:', question);
     const { data, error } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('department', `%${question}%`)
-      .eq('year', 2028)
       .limit(100);
     if (error) console.error('university_subjects 쿼리 에러:', error);
     console.log('결과:', data?.length ?? 0, '행');
