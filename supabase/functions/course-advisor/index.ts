@@ -454,11 +454,11 @@ async function vectorSearchSubjectDescriptions(supabase: any, embedding: number[
   return data;
 }
 
-async function vectorSearchDocuments(supabase: any, embedding: number[]) {
+async function vectorSearchDocuments(supabase: any, embedding: number[], universityKw?: string) {
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
     match_threshold: 0.4,
-    match_count: 8,
+    match_count: 15, // fetch more to allow post-filtering
   });
 
   if (error) {
@@ -466,8 +466,20 @@ async function vectorSearchDocuments(supabase: any, embedding: number[]) {
     return null;
   }
 
-  console.log(`[documents] match_documents results: ${data?.length ?? 0}`);
-  return data;
+  let results = data || [];
+
+  // Post-filter by university metadata if keyword exists
+  if (universityKw && results.length > 0) {
+    const filtered = results.filter((d: any) => {
+      const docUni = d.metadata?.university || "";
+      return docUni.includes(universityKw);
+    });
+    console.log(`[documents] university filter "${universityKw}": ${results.length} → ${filtered.length}`);
+    results = filtered.length > 0 ? filtered : results.slice(0, 3); // fallback to top 3 if nothing matches
+  }
+
+  console.log(`[documents] final results: ${results.length}`);
+  return results.length > 0 ? results.slice(0, 8) : null;
 }
 
 async function getEmbedding(apiKey: string, text: string): Promise<number[] | null> {
