@@ -541,9 +541,10 @@ serve(async (req) => {
         if (embedding) {
           const docData = await vectorSearchDocuments(supabase, embedding);
           if (docData && docData.length > 0) {
-            // documents 결과가 1건 이상이면 절대 권장과목 폴백으로 가지 않음
-            contextBlock = formatVectorResults(docData, "관련 문서 (벡터 검색)");
-            console.log("[routing] documents hit => skip subject fallback");
+            contextBlock = `## ⚠️ 아래 문서 데이터가 검색되었습니다. 반드시 이 내용을 기반으로 답변하세요.\n\n`;
+            contextBlock += formatVectorResults(docData, "관련 문서 (벡터 검색)");
+            console.log(`[routing] documents hit => ${docData.length}건, context length: ${contextBlock.length}자`);
+            console.log(`[routing] context preview: ${contextBlock.substring(0, 300)}...`);
             break;
           }
         }
