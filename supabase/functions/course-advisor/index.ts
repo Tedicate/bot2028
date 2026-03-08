@@ -202,39 +202,89 @@ ${COURSE_DESCRIPTIONS}
 
 // ── DB query helpers ──
 
+// Extract core keyword from department name by stripping suffixes
+function extractDeptKeyword(dept: string): string {
+  return dept.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
+}
+
+// Extract university and department keywords from a question
+function extractSearchKeywords(question: string): { universities: string[]; departments: string[] } {
+  const words = question.split(/\s+/).filter(w => w.length >= 2);
+  const universities: string[] = [];
+  const departments: string[] = [];
+
+  for (const word of words) {
+    if (/대학?교?|대$/.test(word)) {
+      // It's a university name - keep as-is for partial match
+      universities.push(word);
+    } else if (/학과|학부|계열|전공|예과|과$/.test(word)) {
+      // It's a department name - extract core keyword
+      departments.push(extractDeptKeyword(word));
+    } else {
+      // Could be either - treat as department keyword
+      departments.push(word);
+    }
+  }
+
+  return { universities, departments };
+}
+
 async function querySubjectRecommendations(supabase: any, question: string) {
-  // Extract university and department keywords from question
+  const { universities, departments } = extractSearchKeywords(question);
+
+  // Build filters
+  const filters: string[] = [];
+  for (const u of universities) filters.push(`university.ilike.%${u}%`);
+  for (const d of departments) filters.push(`department.ilike.%${d}%`);
+
+  if (filters.length === 0) {
+    // Fallback: use whole question
+    filters.push(`department.ilike.%${question}%`);
+  }
+
+  // If we have both university and department, use AND logic via chained filters
+  if (universities.length > 0 && departments.length > 0) {
+    let query = supabase
+      .from("university_subjects")
+      .select("university, department, subject, is_core, is_recommended, year");
+
+    // Apply university filter (OR across university keywords)
+    const uniFilter = universities.map(u => `university.ilike.%${u}%`).join(",");
+    query = query.or(uniFilter);
+
+    // We can't chain .or() for AND with department, so fetch and filter in JS
+    const { data, error } = await query.order("university").limit(500);
+
+    if (error) {
+      console.error("university_subjects query error:", error);
+      return null;
+    }
+
+    if (!data || data.length === 0) return null;
+
+    // Filter by department keywords in JS
+    const filtered = data.filter((row: any) =>
+      departments.some(d => row.department.toLowerCase().includes(d.toLowerCase()))
+    );
+
+    return filtered.length > 0 ? filtered : data;
+  }
+
+  // Single type of filter (university only or department only)
+  const orFilter = filters.join(",");
   const { data, error } = await supabase
     .from("university_subjects")
     .select("university, department, subject, is_core, is_recommended, year")
-    .or(`department.ilike.%${question}%,university.ilike.%${question}%`)
+    .or(orFilter)
     .order("university")
-    .limit(100);
+    .limit(200);
 
   if (error) {
     console.error("university_subjects query error:", error);
     return null;
   }
 
-  if (!data || data.length === 0) {
-    // Try broader search: split question into words
-    const words = question.split(/\s+/).filter(w => w.length >= 2);
-    if (words.length === 0) return null;
-
-    // Try matching each word
-    const orFilters = words.map(w => `department.ilike.%${w}%,university.ilike.%${w}%`).join(",");
-    const { data: broadData, error: broadError } = await supabase
-      .from("university_subjects")
-      .select("university, department, subject, is_core, is_recommended, year")
-      .or(orFilters)
-      .order("university")
-      .limit(200);
-
-    if (broadError || !broadData || broadData.length === 0) return null;
-    return broadData;
-  }
-
-  return data;
+  return data && data.length > 0 ? data : null;
 }
 
 async function queryAdmissionPlans(supabase: any, question: string) {
