@@ -599,7 +599,7 @@ serve(async (req) => {
     // 디버그 로그 블록 생성
     const debugLog = `[시스템 디버그 로그]
 - 질문: "${question}"
-- 키워드 추출: university="${universityKeyword}", department="${departmentKeyword}"
+- 키워드 추출: university="${universityKeyword}", department="${departmentKeyword}", admission="${admissionKeyword}"
 - 임베딩 생성: ${embeddingSuccess ? "성공" : "실패"}
 - admission_plans SQL 결과: ${admissionPlansCount}건 (에러: ${admissionPlansError})
 - documents 벡터 검색 결과: ${documentsCount}건 (에러: ${documentsError})${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 유사도: ${documentsData.slice(0, 3).map((d: any) => d.similarity?.toFixed(3)).join(", ")}` : ""}${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 미리보기: "${documentsData[0]?.content?.substring(0, 100)}..."` : ""}
