@@ -36,18 +36,18 @@ export default function LegacyDocUploadTab() {
   const fetchDocs = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("documents")
-      .select("id, content, metadata, created_at")
+      .from("subject_descriptions")
+      .select("id, subject_name, category, content, metadata, created_at")
       .order("created_at", { ascending: false })
       .limit(200);
 
     if (error) {
       toast.error("로드 실패: " + error.message);
     } else {
-      let filtered = (data || []) as DocRow[];
-      if (filterSchool) filtered = filtered.filter((d) => (d.metadata as any)?.school?.includes(filterSchool));
-      if (filterType && filterType !== "all") filtered = filtered.filter((d) => (d.metadata as any)?.docType === filterType);
-      if (filterYear) filtered = filtered.filter((d) => String((d.metadata as any)?.year) === filterYear);
+      let filtered = (data || []) as any[];
+      if (filterSchool) filtered = filtered.filter((d) => d.metadata?.school?.includes(filterSchool) || d.subject_name?.includes(filterSchool));
+      if (filterType && filterType !== "all") filtered = filtered.filter((d) => d.metadata?.docType === filterType || d.category === filterType);
+      if (filterYear) filtered = filtered.filter((d) => String(d.metadata?.year) === filterYear);
       setDocs(filtered);
     }
     setLoading(false);
@@ -75,8 +75,12 @@ export default function LegacyDocUploadTab() {
         });
         if (!embedResp.ok) { toast.error(`청크 ${i + 1} 임베딩 실패`); continue; }
         const { embedding } = await embedResp.json();
-        const { error } = await supabase.from("documents").insert({
-          content: chunks[i], metadata, embedding: embedding as any,
+        const { error } = await supabase.from("subject_descriptions").insert({
+          content: chunks[i], 
+          metadata: metadata as any, 
+          embedding: embedding as any,
+          subject_name: school || "",
+          category: docType || "",
         } as any);
         if (error) { toast.error(`청크 ${i + 1} 저장 실패`); continue; }
         success++;
@@ -90,7 +94,7 @@ export default function LegacyDocUploadTab() {
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("documents").delete().in("id", ids);
+    const { error } = await supabase.from("subject_descriptions").delete().in("id", ids);
     if (error) { toast.error("삭제 실패"); } else {
       toast.success(`${ids.length}개 삭제 완료`);
       setSelectedIds(new Set()); fetchDocs();
