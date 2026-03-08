@@ -68,34 +68,30 @@ function useDynamicDeptSuggestions(): string[] {
   const [pool, setPool] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
-      // Get top 6 universities by department count
       const { data } = await supabase
         .from("university_subjects")
-        .select("university, department");
+        .select("university, department, region");
       if (!data || data.length === 0) return;
 
-      // Count departments per university (unique)
-      const uniDepts: Record<string, Set<string>> = {};
+      // Build unique uni-dept pairs grouped by region
+      const uniDepts: Record<string, { depts: Set<string>; region: string }> = {};
       for (const row of data) {
-        if (!uniDepts[row.university]) uniDepts[row.university] = new Set();
-        uniDepts[row.university].add(row.department);
+        if (!uniDepts[row.university]) uniDepts[row.university] = { depts: new Set(), region: row.region };
+        uniDepts[row.university].depts.add(row.department);
       }
 
-      // Sort by department count descending, take top 6
-      const sorted = Object.entries(uniDepts)
-        .sort((a, b) => b[1].size - a[1].size)
-        .slice(0, 6);
-
-      // For each university, pick a representative department
-      const suggestions = sorted.map(([uni, depts]) => {
-        const deptArr = Array.from(depts);
-        const dept = deptArr[Math.floor(Math.random() * deptArr.length)];
-        // Strip "대학교" suffix for display
+      // Generate all possible "대학 학과" combinations
+      const allSuggestions: string[] = [];
+      for (const [uni, info] of Object.entries(uniDepts)) {
         const shortUni = uni.replace(/대학교$/, "대");
-        return `${shortUni} ${dept}`;
-      });
+        for (const dept of info.depts) {
+          allSuggestions.push(`${shortUni} ${dept}`);
+        }
+      }
 
-      setPool(suggestions);
+      // Shuffle and take up to 30 for a rich rotating pool
+      const shuffled = allSuggestions.sort(() => Math.random() - 0.5).slice(0, 30);
+      setPool(shuffled);
     })();
   }, []);
   return pool;
@@ -105,19 +101,19 @@ function useDynamicAdmissionSuggestions(): string[] {
   const [pool, setPool] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
+      // Use university_subjects for richer university list
       const { data } = await supabase
-        .from("admission_plans")
+        .from("university_subjects")
         .select("university");
       if (!data || data.length === 0) return;
 
-      // Unique universities
       const unis = [...new Set(data.map((r) => r.university))];
       const suggestions = unis.map((uni) => {
         const shortUni = uni.replace(/대학교$/, "대");
         return `2028 ${shortUni}`;
       });
 
-      setPool(suggestions);
+      setPool(suggestions.sort(() => Math.random() - 0.5));
     })();
   }, []);
   return pool;
@@ -138,9 +134,9 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(4, Math.max(1, deptPool.length)), 3000);
+  const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(6, Math.max(1, deptPool.length)), 3000);
   const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 6, 3000);
-  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(3, Math.max(1, admissionPool.length)), 3000);
+  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(4, Math.max(1, admissionPool.length)), 3000);
 
   useEffect(() => {
     if (messages.length > 0) {

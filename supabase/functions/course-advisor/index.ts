@@ -729,6 +729,12 @@ serve(async (req) => {
       contextBlock += formatSubjectRecommendations(uniSubjectsData);
     }
 
+    // Partial data: admission plans missing but subjects exist
+    if (admissionPlansCount === 0 && documentsCount === 0 && uniSubjectsCount > 0 && universityKeyword) {
+      contextBlock += `⚠️ "${universityKeyword}" 대학교의 전형 상세 자료(admission_plans, documents)는 아직 등록되지 않았지만, 권장과목 데이터는 있습니다.\n`;
+      contextBlock += `"현재 해당 대학의 상세 전형은 등록 중입니다. 권장과목 정보를 먼저 확인해보시겠어요?"라고 안내하고, 해당 대학의 학과별 권장과목을 SUGGEST 버튼으로 유도하세요.\n\n`;
+    }
+
     if (documentsCount === 0 && admissionPlansCount === 0 && uniSubjectsCount === 0) {
       if (universityKeyword) {
         contextBlock += `⚠️ "${universityKeyword}" 대학교의 2028학년도 전형 자료(admission_plans, documents, university_subjects)가 모두 등록되어 있지 않습니다.\n`;
