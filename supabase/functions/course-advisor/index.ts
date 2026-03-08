@@ -231,6 +231,7 @@ function extractSearchKeywords(question: string): { universities: string[]; depa
 
 async function querySubjectRecommendations(supabase: any, question: string) {
   const { universities, departments } = extractSearchKeywords(question);
+  console.log(`[DEBUG] extractSearchKeywords result — universities: [${universities.join(", ")}], departments: [${departments.join(", ")}]`);
 
   // Build filters
   const filters: string[] = [];
@@ -238,22 +239,26 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   for (const d of departments) filters.push(`department.ilike.%${d}%`);
 
   if (filters.length === 0) {
-    // Fallback: use whole question
     filters.push(`department.ilike.%${question}%`);
+    console.log(`[DEBUG] No keywords extracted, using full question as filter`);
   }
 
-  // If we have both university and department, use AND logic via chained filters
+  // If we have both university and department, use AND logic
   if (universities.length > 0 && departments.length > 0) {
-    let query = supabase
-      .from("university_subjects")
-      .select("university, department, subject, is_core, is_recommended, year");
-
-    // Apply university filter (OR across university keywords)
     const uniFilter = universities.map(u => `university.ilike.%${u}%`).join(",");
-    query = query.or(uniFilter);
+    console.log(`[DEBUG] AND search — uniFilter: "${uniFilter}", deptKeywords: [${departments.join(", ")}]`);
 
-    // We can't chain .or() for AND with department, so fetch and filter in JS
-    const { data, error } = await query.order("university").limit(500);
+    const { data, error } = await supabase
+      .from("university_subjects")
+      .select("university, department, subject, is_core, is_recommended, year")
+      .or(uniFilter)
+      .order("university")
+      .limit(500);
+
+    console.log(`[DEBUG] university_subjects AND query — error: ${JSON.stringify(error)}, rows: ${data?.length ?? 0}`);
+    if (data && data.length > 0) {
+      console.log(`[DEBUG] Sample row: ${JSON.stringify(data[0])}`);
+    }
 
     if (error) {
       console.error("university_subjects query error:", error);
@@ -266,12 +271,15 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     const filtered = data.filter((row: any) =>
       departments.some(d => row.department.toLowerCase().includes(d.toLowerCase()))
     );
+    console.log(`[DEBUG] JS dept filter — before: ${data.length}, after: ${filtered.length}`);
 
     return filtered.length > 0 ? filtered : data;
   }
 
   // Single type of filter (university only or department only)
   const orFilter = filters.join(",");
+  console.log(`[DEBUG] Single filter search — orFilter: "${orFilter}"`);
+
   const { data, error } = await supabase
     .from("university_subjects")
     .select("university, department, subject, is_core, is_recommended, year")
@@ -279,9 +287,9 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     .order("university")
     .limit(200);
 
-  if (error) {
-    console.error("university_subjects query error:", error);
-    return null;
+  console.log(`[DEBUG] university_subjects single query — error: ${JSON.stringify(error)}, rows: ${data?.length ?? 0}`);
+  if (data && data.length > 0) {
+    console.log(`[DEBUG] Sample row: ${JSON.stringify(data[0])}`);
   }
 
   return data && data.length > 0 ? data : null;
@@ -458,11 +466,16 @@ serve(async (req) => {
           contextBlock = formatSubjectRecommendations(data);
         } else {
           // Fallback: also try university_courses table
-          const { data: coursesData } = await supabase
+          console.log(`[DEBUG] university_subjects returned no data, falling back to university_courses`);
+          const fallbackFilter = `department.ilike.%${question}%,university.ilike.%${question}%`;
+          console.log(`[DEBUG] university_courses fallback filter: "${fallbackFilter}"`);
+          const { data: coursesData, error: coursesError } = await supabase
             .from("university_courses")
             .select("*")
-            .or(`department.ilike.%${question}%,university.ilike.%${question}%`)
+            .or(fallbackFilter)
             .limit(100);
+
+          console.log(`[DEBUG] university_courses fallback — error: ${JSON.stringify(coursesError)}, rows: ${coursesData?.length ?? 0}`);
 
           if (coursesData && coursesData.length > 0) {
             contextBlock = "## 조회된 대학별 권장과목 데이터 (legacy)\n\n";
