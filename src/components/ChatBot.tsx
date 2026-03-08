@@ -142,6 +142,7 @@ export default function ChatBot() {
 
   const deptPool = useDynamicDeptSuggestions();
   const admissionPool = useDynamicAdmissionSuggestions();
+  const subjectPool = useDynamicSubjectSuggestions();
 
   const goHome = () => {
     setMessages([]);
@@ -149,8 +150,8 @@ export default function ChatBot() {
     navigate("/");
   };
   const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(6, Math.max(1, deptPool.length)), 3000);
-  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 6, 3000);
-  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(4, Math.max(1, admissionPool.length)), 3000);
+  const subjectSuggestions = useRotatingSuggestions(subjectPool, Math.min(5, Math.max(1, subjectPool.length)), 3000);
+  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(3, Math.max(1, admissionPool.length)), 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
