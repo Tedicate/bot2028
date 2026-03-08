@@ -19,7 +19,11 @@ const ALL_ADMISSION_SUGGESTIONS = [
   "서울대 2028 전형안", "경희대 2028 전형안", "건국대 2028 전형안",
 ];
 
-const ALL_SUBJECT_SUGGESTIONS: string[] = [];
+const ALL_SUBJECT_SUGGESTIONS = [
+  "미적분II", "기하", "확률과 통계", "물리학", "화학",
+  "생명과학", "역학과 에너지", "정보", "인공지능 기초",
+  "데이터 과학", "세포와 물질대사", "생물의 유전",
+];
 
 function shuffleAndPick<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
@@ -76,9 +80,9 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, 8, 3000);
-  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 8, 3000);
-  const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, 6, 4000);
+  const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, Math.min(8, ALL_DEPT_SUGGESTIONS.length), 3000);
+  const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, Math.min(8, ALL_SUBJECT_SUGGESTIONS.length), 3000);
+  const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, Math.min(8, ALL_ADMISSION_SUGGESTIONS.length), 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -295,9 +299,14 @@ export default function ChatBot() {
                 예: "서울대 컴퓨터공학부" 또는 "미적분II"
               </p>
 
-              <div className="w-full max-w-md mb-4">
-                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">🎓 인기 학과</p>
-                <div className="flex flex-wrap gap-2 min-h-[88px]">
+              <div className="w-full max-w-2xl grid grid-cols-3 gap-3 text-center">
+                {/* Headers */}
+                <p className="text-xs font-semibold text-muted-foreground px-1">🎓 인기 학과</p>
+                <p className="text-xs font-semibold text-muted-foreground px-1">📋 대학별 전형안</p>
+                <p className="text-xs font-semibold text-muted-foreground px-1">📚 주요 과목</p>
+
+                {/* Columns */}
+                <div className="flex flex-col gap-2">
                   <AnimatePresence mode="popLayout">
                     {deptSuggestions.map((s) => (
                       <motion.button
@@ -308,42 +317,15 @@ export default function ChatBot() {
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         onClick={() => send(s)}
-                        className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                        className="px-3 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {s}
                       </motion.button>
                     ))}
                   </AnimatePresence>
                 </div>
-              </div>
 
-              {subjectSuggestions.length > 0 && (
-              <div className="w-full max-w-md">
-                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
-                <div className="flex flex-wrap gap-2 min-h-[88px]">
-                  <AnimatePresence mode="popLayout">
-                    {subjectSuggestions.map((s) => (
-                      <motion.button
-                        key={s}
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.35, ease: "easeOut" }}
-                        onClick={() => send(s)}
-                        className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                      >
-                        {s}
-                      </motion.button>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-              )}
-
-              <div className="w-full max-w-md">
-                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📋 대학별 전형안</p>
-                <div className="flex flex-wrap gap-2 min-h-[66px]">
+                <div className="flex flex-col gap-2">
                   <AnimatePresence mode="popLayout">
                     {admissionSuggestions.map((s) => (
                       <motion.button
@@ -354,7 +336,26 @@ export default function ChatBot() {
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         onClick={() => send(s)}
-                        className="px-4 py-2 rounded-full bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                        className="px-3 py-2 rounded-full bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {s}
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <AnimatePresence mode="popLayout">
+                    {subjectSuggestions.map((s) => (
+                      <motion.button
+                        key={s}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        onClick={() => send(s)}
+                        className="px-3 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {s}
                       </motion.button>
