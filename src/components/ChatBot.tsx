@@ -16,7 +16,7 @@ const ALL_DEPT_SUGGESTIONS = [
 ];
 
 const ALL_ADMISSION_SUGGESTIONS = [
-  "서울대 2028 전형안", "경희대 2028 전형안", "건국대 2028 전형안",
+  "2028 서울대", "2028 경희대", "2028 건국대",
 ];
 
 const ALL_SUBJECT_SUGGESTIONS = [
