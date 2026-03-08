@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.seed-data]
 verify_jwt = false
+
+[functions.gemini-embed]
+verify_jwt = false
+
+[functions.gemini-chat]
+verify_jwt = false
