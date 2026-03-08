@@ -202,96 +202,85 @@ ${COURSE_DESCRIPTIONS}
 
 // ── DB query helpers ──
 
-// Extract core keyword from department name by stripping suffixes
-function extractDeptKeyword(dept: string): string {
-  return dept.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
-}
-
-// Extract university and department keywords from a question
-function extractSearchKeywords(question: string): { universities: string[]; departments: string[] } {
+// Extract university and department keywords from question text
+function extractKeywords(question: string): { universityKeyword: string; departmentKeyword: string } {
   const words = question.split(/\s+/).filter(w => w.length >= 2);
-  const universities: string[] = [];
-  const departments: string[] = [];
+  let universityKeyword = "";
+  let departmentKeyword = "";
 
   for (const word of words) {
     if (/대학?교?|대$/.test(word)) {
-      // It's a university name - keep as-is for partial match
-      universities.push(word);
+      universityKeyword = word;
     } else if (/학과|학부|계열|전공|예과|과$/.test(word)) {
-      // It's a department name - extract core keyword
-      departments.push(extractDeptKeyword(word));
-    } else {
-      // Could be either - treat as department keyword
-      departments.push(word);
+      departmentKeyword = word.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
     }
   }
 
-  return { universities, departments };
+  // If no department found with suffix, try remaining non-university words
+  if (!departmentKeyword) {
+    const remaining = words.filter(w => w !== universityKeyword && !/권장|추천|과목|알려|어떤/.test(w));
+    if (remaining.length > 0) departmentKeyword = remaining[0];
+  }
+
+  return { universityKeyword, departmentKeyword };
 }
 
 async function querySubjectRecommendations(supabase: any, question: string) {
-  const { universities, departments } = extractSearchKeywords(question);
-  console.log(`[DEBUG] extractSearchKeywords result — universities: [${universities.join(", ")}], departments: [${departments.join(", ")}]`);
+  const { universityKeyword, departmentKeyword } = extractKeywords(question);
+  console.log('키워드 추출 결과 — university:', universityKeyword, 'department:', departmentKeyword);
 
-  // Build filters
-  const filters: string[] = [];
-  for (const u of universities) filters.push(`university.ilike.%${u}%`);
-  for (const d of departments) filters.push(`department.ilike.%${d}%`);
-
-  if (filters.length === 0) {
-    filters.push(`department.ilike.%${question}%`);
-    console.log(`[DEBUG] No keywords extracted, using full question as filter`);
-  }
-
-  // If we have both university and department, use AND logic
-  if (universities.length > 0 && departments.length > 0) {
-    const uniFilter = universities.map(u => `university.ilike.%${u}%`).join(",");
-    console.log(`[DEBUG] AND search — uniFilter: "${uniFilter}", deptKeywords: [${departments.join(", ")}]`);
-
+  if (!universityKeyword && !departmentKeyword) {
+    console.log('키워드 없음, 전체 질문으로 검색:', question);
     const { data, error } = await supabase
-      .from("university_subjects")
-      .select("university, department, subject, is_core, is_recommended, year")
-      .or(uniFilter)
-      .order("university")
-      .limit(500);
-
-    console.log(`[DEBUG] university_subjects AND query — error: ${JSON.stringify(error)}, rows: ${data?.length ?? 0}`);
-    if (data && data.length > 0) {
-      console.log(`[DEBUG] Sample row: ${JSON.stringify(data[0])}`);
-    }
-
-    if (error) {
-      console.error("university_subjects query error:", error);
-      return null;
-    }
-
-    if (!data || data.length === 0) return null;
-
-    // Filter by department keywords in JS
-    const filtered = data.filter((row: any) =>
-      departments.some(d => row.department.toLowerCase().includes(d.toLowerCase()))
-    );
-    console.log(`[DEBUG] JS dept filter — before: ${data.length}, after: ${filtered.length}`);
-
-    return filtered.length > 0 ? filtered : data;
+      .from('university_subjects')
+      .select('university, department, subject, is_core, is_recommended')
+      .ilike('department', `%${question}%`)
+      .eq('year', 2028)
+      .limit(100);
+    if (error) console.error('university_subjects 쿼리 에러:', error);
+    console.log('결과:', data?.length ?? 0, '행');
+    return data && data.length > 0 ? data : null;
   }
 
-  // Single type of filter (university only or department only)
-  const orFilter = filters.join(",");
-  console.log(`[DEBUG] Single filter search — orFilter: "${orFilter}"`);
+  // Both university and department
+  if (universityKeyword && departmentKeyword) {
+    const { data, error } = await supabase
+      .from('university_subjects')
+      .select('university, department, subject, is_core, is_recommended')
+      .ilike('university', `%${universityKeyword}%`)
+      .ilike('department', `%${departmentKeyword}%`)
+      .eq('year', 2028);
 
+    if (error) console.error('university_subjects 쿼리 에러:', error);
+    console.log('university_subjects 결과:', data?.length ?? 0, '행', 'university:', universityKeyword, 'department:', departmentKeyword);
+
+    if (data && data.length > 0) return data;
+
+    // Fallback: university only
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('university_subjects')
+      .select('university, department, subject, is_core, is_recommended')
+      .ilike('university', `%${universityKeyword}%`)
+      .eq('year', 2028)
+      .limit(30);
+
+    if (fallbackError) console.error('폴백 쿼리 에러:', fallbackError);
+    console.log('폴백 결과:', fallbackData?.length ?? 0, '행');
+    return fallbackData && fallbackData.length > 0 ? fallbackData : null;
+  }
+
+  // University only or department only
+  const filterCol = universityKeyword ? 'university' : 'department';
+  const filterVal = universityKeyword || departmentKeyword;
   const { data, error } = await supabase
-    .from("university_subjects")
-    .select("university, department, subject, is_core, is_recommended, year")
-    .or(orFilter)
-    .order("university")
+    .from('university_subjects')
+    .select('university, department, subject, is_core, is_recommended')
+    .ilike(filterCol, `%${filterVal}%`)
+    .eq('year', 2028)
     .limit(200);
 
-  console.log(`[DEBUG] university_subjects single query — error: ${JSON.stringify(error)}, rows: ${data?.length ?? 0}`);
-  if (data && data.length > 0) {
-    console.log(`[DEBUG] Sample row: ${JSON.stringify(data[0])}`);
-  }
-
+  if (error) console.error('university_subjects 쿼리 에러:', error);
+  console.log('university_subjects 단일 필터 결과:', data?.length ?? 0, '행', filterCol, ':', filterVal);
   return data && data.length > 0 ? data : null;
 }
 
