@@ -206,22 +206,22 @@ ${COURSE_DESCRIPTIONS}
 function extractKeywords(question: string): { universityKeyword: string; departmentKeyword: string } {
   const words = question.split(/\s+/).filter(w => w.length >= 2);
   let universityKeyword = "";
-  let departmentKeyword = "";
+  const departmentCandidates: string[] = [];
 
   for (const word of words) {
-    if (/대학?교?|대$/.test(word)) {
-      universityKeyword = word;
+    if (/대학교|대학|대$|대학?교?/.test(word)) {
+      // Strip university suffixes for broader matching
+      universityKeyword = word.replace(/(대학교|대학|대)$/g, "").trim() || word;
     } else if (/학과|학부|계열|전공|예과|과$/.test(word)) {
-      departmentKeyword = word.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
+      const stripped = word.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
+      if (stripped) departmentCandidates.push(stripped);
+    } else if (!/권장|추천|과목|알려|어떤|정보|보여|상세/.test(word)) {
+      // Unrecognized words → treat as department keyword candidates
+      departmentCandidates.push(word);
     }
   }
 
-  // If no department found with suffix, try remaining non-university words
-  if (!departmentKeyword) {
-    const remaining = words.filter(w => w !== universityKeyword && !/권장|추천|과목|알려|어떤/.test(w));
-    if (remaining.length > 0) departmentKeyword = remaining[0];
-  }
-
+  const departmentKeyword = departmentCandidates[0] || "";
   return { universityKeyword, departmentKeyword };
 }
 
