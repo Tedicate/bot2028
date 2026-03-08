@@ -12,6 +12,11 @@ type QuestionType = "subject_recommendation" | "admission_plan" | "subject_descr
 function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
 
+  // 전형 철학/평가 방식 질문 (최우선 체크 — 벡터 검색 필요)
+  if (/평가|방식|철학|어떤\s*학생|인재상|선발\s*기준|평가\s*기준|어떻게\s*평가|어떻게\s*선발|어떤\s*인재|가치|핵심\s*역량|역량/.test(lower)) {
+    return "admission_philosophy";
+  }
+
   // 권장과목/추천과목 질문
   if (/권장\s*과목|추천\s*과목|뭐\s*들어야|과목\s*추천|어떤\s*과목.*들어|이수.*과목|필수.*과목/.test(lower)) {
     return "subject_recommendation";
@@ -25,11 +30,6 @@ function classifyQuestion(text: string): QuestionType {
   // 과목 내용/설명 질문
   if (/어떤\s*과목|무슨\s*내용|뭐\s*배워|선이수|위계\s*과목|과목\s*설명|과목.*내용/.test(lower)) {
     return "subject_description";
-  }
-
-  // 전형 철학/평가 방식 질문
-  if (/어떤\s*학생|전형\s*철학|평가\s*방식|인재상|선발\s*기준/.test(lower)) {
-    return "admission_philosophy";
   }
 
   // Default: try to detect if it's a university+department or subject name
