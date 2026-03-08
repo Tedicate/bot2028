@@ -41,8 +41,20 @@ function classifyQuestion(text: string): QuestionType {
   const hasUniversityPattern = /대학?교?|대$/.test(lower);
   const hasDepartmentPattern = /학과|학부|계열|전공|예과/.test(lower);
 
-  if (hasUniversityPattern || hasDepartmentPattern) {
+  // University-only: has university name but no department, no admission keyword, no other specific intent
+  if (hasUniversityPattern && !hasDepartmentPattern) {
+    return "university_only";
+  }
+
+  if (hasDepartmentPattern) {
     return "subject_recommendation";
+  }
+
+  // Check if input is just a known university alias (e.g. "중앙대", "서울대")
+  const trimmed = text.trim();
+  const KNOWN_UNI_ALIASES = Object.keys(UNIVERSITY_ALIASES);
+  if (KNOWN_UNI_ALIASES.some(alias => trimmed === alias || trimmed === alias + "학교")) {
+    return "university_only";
   }
 
   return "general";
