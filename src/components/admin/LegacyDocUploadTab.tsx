@@ -94,7 +94,7 @@ export default function LegacyDocUploadTab() {
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("documents").delete().in("id", ids);
+    const { error } = await supabase.from("subject_descriptions").delete().in("id", ids);
     if (error) { toast.error("삭제 실패"); } else {
       toast.success(`${ids.length}개 삭제 완료`);
       setSelectedIds(new Set()); fetchDocs();
