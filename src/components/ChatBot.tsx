@@ -134,9 +134,9 @@ export default function ChatBot() {
     setInput("");
     navigate("/");
   };
-  const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(4, Math.max(1, deptPool.length)), 3000);
+  const deptSuggestions = useRotatingSuggestions(deptPool, Math.min(6, Math.max(1, deptPool.length)), 3000);
   const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 6, 3000);
-  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(3, Math.max(1, admissionPool.length)), 3000);
+  const admissionSuggestions = useRotatingSuggestions(admissionPool, Math.min(4, Math.max(1, admissionPool.length)), 3000);
 
   useEffect(() => {
     if (messages.length > 0) {
