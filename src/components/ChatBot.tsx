@@ -400,7 +400,7 @@ export default function ChatBot() {
                 {/* Column: 주요 과목 */}
                 <div className="flex flex-col gap-2">
                   <AnimatePresence mode="popLayout">
-                    {subjectSuggestions.map((s) => (
+                    {subjectSuggestions.map((s: string) => (
                       <motion.button
                         key={s}
                         layout
