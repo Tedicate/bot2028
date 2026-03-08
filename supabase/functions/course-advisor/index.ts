@@ -245,10 +245,9 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   if (universityKeyword && departmentKeyword) {
     const { data, error } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('university', `%${universityKeyword}%`)
-      .ilike('department', `%${departmentKeyword}%`)
-      .eq('year', 2028);
+      .ilike('department', `%${departmentKeyword}%`);
 
     if (error) console.error('university_subjects 쿼리 에러:', error);
     console.log('university_subjects 결과:', data?.length ?? 0, '행', 'university:', universityKeyword, 'department:', departmentKeyword);
