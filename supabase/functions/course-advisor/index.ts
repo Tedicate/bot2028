@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // ── Question type classification ──
-type QuestionType = "subject_recommendation" | "admission_plan" | "subject_description" | "admission_philosophy" | "general";
+type QuestionType = "university_only" | "subject_recommendation" | "admission_plan" | "subject_description" | "admission_philosophy" | "general";
 
 function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
