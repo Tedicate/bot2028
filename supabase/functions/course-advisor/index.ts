@@ -454,30 +454,7 @@ serve(async (req) => {
         if (data && data.length > 0) {
           contextBlock = formatSubjectRecommendations(data);
         } else {
-          // Fallback: also try university_courses table
-          console.log(`[DEBUG] university_subjects returned no data, falling back to university_courses`);
-          const fallbackFilter = `department.ilike.%${question}%,university.ilike.%${question}%`;
-          console.log(`[DEBUG] university_courses fallback filter: "${fallbackFilter}"`);
-          const { data: coursesData, error: coursesError } = await supabase
-            .from("university_courses")
-            .select("*")
-            .or(fallbackFilter)
-            .limit(100);
-
-          console.log(`[DEBUG] university_courses fallback — error: ${JSON.stringify(coursesError)}, rows: ${coursesData?.length ?? 0}`);
-
-          if (coursesData && coursesData.length > 0) {
-            contextBlock = "## 조회된 대학별 권장과목 데이터 (legacy)\n\n";
-            for (const row of coursesData) {
-              contextBlock += `### ${row.university} ${row.department || row.college || ""}\n`;
-              if (row.core_subjects) contextBlock += `- **핵심 과목**: ${row.core_subjects}\n`;
-              if (row.recommended_subjects) contextBlock += `- **권장 과목**: ${row.recommended_subjects}\n`;
-              if (row.notes) contextBlock += `- **비고**: ${row.notes}\n`;
-              contextBlock += "\n";
-            }
-          } else {
-            contextBlock = "해당 학과/대학에 대한 권장과목 데이터가 아직 등록되지 않았습니다.\n";
-          }
+          contextBlock = "해당 학과/대학에 대한 권장과목 데이터가 아직 등록되지 않았습니다.\n";
         }
         break;
       }
