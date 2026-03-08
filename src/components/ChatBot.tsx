@@ -23,6 +23,14 @@ const ALL_DEPT_SUGGESTIONS = [
   "서울대 수의예과", "경희대 소프트웨어융합학과", "서울시립대 조경학과",
 ];
 
+const ALL_ADMISSION_SUGGESTIONS = [
+  "서울대 2028 전형안", "고려대 2028 전형안", "연세대 2028 전형안",
+  "경희대 2028 전형안", "건국대 2028 전형안", "중앙대 2028 전형안",
+  "한양대 2028 전형안", "성균관대 2028 전형안", "서강대 2028 전형안",
+  "동국대 2028 전형안", "숭실대 2028 전형안", "홍익대 2028 전형안",
+  "인하대 2028 전형안", "서울시립대 2028 전형안", "부산대 2028 전형안",
+];
+
 const ALL_SUBJECT_SUGGESTIONS = [
   "미적분II", "기하", "역학과 에너지", "물질과 에너지",
   "정보", "인공지능 기초", "데이터 과학", "생명과학과 지구시스템",
@@ -90,6 +98,7 @@ export default function ChatBot() {
   };
   const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, 8, 3000);
   const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 8, 3000);
+  const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, 6, 4000);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -342,6 +351,28 @@ export default function ChatBot() {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         onClick={() => send(s)}
                         className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {s}
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              <div className="w-full max-w-md">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📋 대학별 전형안</p>
+                <div className="flex flex-wrap gap-2 min-h-[66px]">
+                  <AnimatePresence mode="popLayout">
+                    {admissionSuggestions.map((s) => (
+                      <motion.button
+                        key={s}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        onClick={() => send(s)}
+                        className="px-4 py-2 rounded-full bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {s}
                       </motion.button>

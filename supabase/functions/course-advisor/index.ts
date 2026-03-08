@@ -12,6 +12,11 @@ type QuestionType = "subject_recommendation" | "admission_plan" | "subject_descr
 function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
 
+  // 전형안 질문 (대학+전형안/전형 패턴)
+  if (/전형안|2028\s*전형|전형\s*종류|전형\s*목록|어떤\s*전형|전형\s*안내/.test(lower)) {
+    return "admission_plan";
+  }
+
   // 전형 철학/평가 방식 질문 (최우선 체크 — 벡터 검색 필요)
   if (/평가|방식|철학|어떤\s*학생|인재상|선발\s*기준|평가\s*기준|어떻게\s*평가|어떻게\s*선발|어떤\s*인재|가치|핵심\s*역량|역량|학생부종합|종합전형|학종/.test(lower)) {
     return "admission_philosophy";
@@ -33,8 +38,6 @@ function classifyQuestion(text: string): QuestionType {
   }
 
   // Default: try to detect if it's a university+department or subject name
-  // University names typically contain 대, 대학
-  // Subject names match known patterns
   const hasUniversityPattern = /대학?교?|대$/.test(lower);
   const hasDepartmentPattern = /학과|학부|계열|전공|예과/.test(lower);
 
@@ -145,6 +148,24 @@ const SYSTEM_PROMPT = `당신은 2028 대학입시를 준비하는 한국 고등
 - 수능최저학력기준, 전형방법, 교과이수반영 여부 등을 정확히 전달
 - 숫자와 세부사항은 데이터 그대로 인용
 
+**"XX대 2028 전형안" 같은 전형 안내 질문일 때:**
+1단계: 해당 대학의 전형 목록을 보여주며 "어떤 전형이 궁금하신가요?" 질문
+- 데이터가 있으면 admission_plans에서 가져온 전형명을 <!--SUGGEST:XX대 학생부교과전형--> 버튼으로 제시
+- 데이터가 없으면 documents 벡터 검색 결과를 기반으로 해당 대학에서 언급된 전형명을 추출하여 SUGGEST 버튼으로 제시
+- 전형 버튼은 반드시 "대학명 전형명" 형태로: <!--SUGGEST:건국대 학생부종합전형-->
+- 추가로 해당 대학의 인기 학과도 함께 제안: <!--SUGGEST:건국대 컴퓨터공학부 권장과목-->
+
+2단계: 사용자가 특정 전형을 선택하면 상세 정보를 제공
+- 전형 방법, 수능 최저, 교과이수 반영 등 핵심 정보를 구조화
+- **반드시** 해당 전형에서 권장과목이 중요한 경우 "이 전형에서는 교과이수를 반영하므로, 권장과목 확인이 중요합니다"와 함께 학과별 권장과목 조회를 유도하는 SUGGEST 버튼을 추가
+- 예: <!--SUGGEST:건국대 컴퓨터공학부 권장과목--> <!--SUGGEST:건국대 경영학과 권장과목-->
+
+**전형↔과목↔학과 연계 규칙 (매우 중요!):**
+- 전형 설명 후 반드시 "이 대학의 학과별 권장과목도 확인해보세요!" 문구와 함께 해당 대학 학과 SUGGEST 버튼 2~3개 추가
+- 과목 설명 후 "이 과목을 권장하는 학과"를 SUGGEST 버튼으로 추가  
+- 학과 권장과목 설명 후 "이 대학의 전형도 확인해보세요!" 문구와 함께 전형 SUGGEST 버튼 추가
+- 이렇게 [전형] ↔ [권장과목] ↔ [과목설명]이 꼬리를 물고 이어지도록 구성
+
 ### 유형 3: 과목 설명 (subject_descriptions 벡터검색 결과 제공)
 과목 내용, 선이수 과목 등의 질문에는 벡터검색으로 찾은 과목 설명을 기반으로 답변합니다.
 
@@ -191,11 +212,13 @@ const SYSTEM_PROMPT = `당신은 2028 대학입시를 준비하는 한국 고등
   - **확률과 통계** ← 공통수학1, 공통수학2 선이수 필요
 
 ## 후속 질문 버튼 규칙 (매우 중요)
-- 답변 마지막에 반드시 <!--SUGGEST:텍스트--> 형태로 후속 질문 버튼을 3~6개 추가해.
+- 답변 마지막에 반드시 <!--SUGGEST:텍스트--> 형태로 후속 질문 버튼을 4~8개 추가해.
 - 버튼에는 반드시 데이터에 실제로 존재하는 과목명이나 "대학명 학과명" 조합만 사용해.
 - 존재하지 않는 과목이나 학과를 절대 만들어내지 마.
 - 학과 버튼은 반드시 "대학명 학과명" 형태로 써. 예: <!--SUGGEST:경희대 의예과-->
+- 전형 버튼은 "대학명 전형명" 형태로 써. 예: <!--SUGGEST:건국대 학생부종합전형-->
 - 음악, 미술, 체육 관련 학과나 과목은 추천하지 마.
+- **꼬리물기 규칙**: 학과 답변 후 → 전형 버튼 추가, 전형 답변 후 → 학과/과목 버튼 추가, 과목 답변 후 → 학과 버튼 추가. 항상 다른 카테고리로 연결되는 버튼을 1~2개 이상 포함해.
 
 ## 가독성 규칙 (매우 중요!)
 대부분의 사용자가 모바일 환경에서 읽습니다.
@@ -238,8 +261,8 @@ const ADMISSION_TYPE_ALIASES: Record<string, string> = {
 // 전형 관련 키워드 목록 (department로 취급하면 안 되는 단어들)
 const ADMISSION_KEYWORDS_SET = new Set([
   "학종", "학생부종합", "학생부종합전형", "교과", "학생부교과", "학생부교과전형",
-  "논술", "논술위주전형", "정시", "수능위주전형", "수능", "전형",
-  "수시", "종합전형", "교과전형",
+  "논술", "논술위주전형", "정시", "수능위주전형", "수능", "전형", "전형안",
+  "수시", "종합전형", "교과전형", "2028",
 ]);
 
 // Extract university, department, and admission type keywords from question text
