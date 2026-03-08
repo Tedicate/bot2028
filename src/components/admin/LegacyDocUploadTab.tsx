@@ -36,18 +36,18 @@ export default function LegacyDocUploadTab() {
   const fetchDocs = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("documents")
-      .select("id, content, metadata, created_at")
+      .from("subject_descriptions")
+      .select("id, subject_name, category, content, metadata, created_at")
       .order("created_at", { ascending: false })
       .limit(200);
 
     if (error) {
       toast.error("로드 실패: " + error.message);
     } else {
-      let filtered = (data || []) as DocRow[];
-      if (filterSchool) filtered = filtered.filter((d) => (d.metadata as any)?.school?.includes(filterSchool));
-      if (filterType && filterType !== "all") filtered = filtered.filter((d) => (d.metadata as any)?.docType === filterType);
-      if (filterYear) filtered = filtered.filter((d) => String((d.metadata as any)?.year) === filterYear);
+      let filtered = (data || []) as any[];
+      if (filterSchool) filtered = filtered.filter((d) => d.metadata?.school?.includes(filterSchool) || d.subject_name?.includes(filterSchool));
+      if (filterType && filterType !== "all") filtered = filtered.filter((d) => d.metadata?.docType === filterType || d.category === filterType);
+      if (filterYear) filtered = filtered.filter((d) => String(d.metadata?.year) === filterYear);
       setDocs(filtered);
     }
     setLoading(false);
