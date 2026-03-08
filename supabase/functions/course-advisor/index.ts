@@ -473,9 +473,10 @@ serve(async (req) => {
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     const question = lastUserMsg?.content || "";
 
-    // Classify question type
-    const questionType = classifyQuestion(question);
-    console.log(`Question type: ${questionType}, question: "${question}"`);
+    // Classify question type (평가/철학 계열은 무조건 documents 우선)
+    const forceDocumentsFirst = isAdmissionPhilosophyPriorityQuery(question);
+    const questionType = forceDocumentsFirst ? "admission_philosophy" : classifyQuestion(question);
+    console.log(`Routing => forceDocumentsFirst=${forceDocumentsFirst}, questionType=${questionType}, question="${question}"`);
 
     // Build context based on question type
     let contextBlock = "";
