@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      admission_documents: {
+        Row: {
+          admission_type: string
+          content: string
+          content_type: string
+          created_at: string | null
+          document_type: string
+          embedding: string | null
+          id: string
+          source_file: string | null
+          university: string
+          year: number
+        }
+        Insert: {
+          admission_type?: string
+          content?: string
+          content_type?: string
+          created_at?: string | null
+          document_type?: string
+          embedding?: string | null
+          id?: string
+          source_file?: string | null
+          university?: string
+          year?: number
+        }
+        Update: {
+          admission_type?: string
+          content?: string
+          content_type?: string
+          created_at?: string | null
+          document_type?: string
+          embedding?: string | null
+          id?: string
+          source_file?: string | null
+          university?: string
+          year?: number
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           content: string
