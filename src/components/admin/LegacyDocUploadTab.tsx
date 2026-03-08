@@ -75,8 +75,12 @@ export default function LegacyDocUploadTab() {
         });
         if (!embedResp.ok) { toast.error(`청크 ${i + 1} 임베딩 실패`); continue; }
         const { embedding } = await embedResp.json();
-        const { error } = await supabase.from("documents").insert({
-          content: chunks[i], metadata, embedding: embedding as any,
+        const { error } = await supabase.from("subject_descriptions").insert({
+          content: chunks[i], 
+          metadata: metadata as any, 
+          embedding: embedding as any,
+          subject_name: school || "",
+          category: docType || "",
         } as any);
         if (error) { toast.error(`청크 ${i + 1} 저장 실패`); continue; }
         success++;
