@@ -526,13 +526,37 @@ serve(async (req) => {
       case "admission_philosophy": {
         const embedding = await getEmbedding(GEMINI_API_KEY, question);
         if (embedding) {
-          const data = await vectorSearchDocuments(supabase, embedding);
-          if (data && data.length > 0) {
-            contextBlock = formatVectorResults(data, "관련 문서 (벡터 검색)");
+          let allResults = await vectorSearchDocuments(supabase, embedding);
+          
+          // Post-filter by university keyword if present (partial match)
+          const { universityKeyword } = extractKeywords(question);
+          if (allResults && allResults.length > 0 && universityKeyword) {
+            const filtered = allResults.filter((item: any) => {
+              const meta = item.metadata;
+              if (!meta) return true; // keep items without metadata
+              const metaStr = JSON.stringify(meta);
+              return metaStr.includes(universityKeyword);
+            });
+            // Use filtered if any match, otherwise keep all results
+            if (filtered.length > 0) {
+              allResults = filtered;
+            }
+            console.log(`벡터 검색 메타데이터 필터: "${universityKeyword}" → ${filtered.length}/${allResults.length}건`);
+          }
+          
+          if (allResults && allResults.length > 0) {
+            contextBlock = formatVectorResults(allResults, "관련 문서 (벡터 검색)");
           }
         }
         if (!contextBlock) {
-          contextBlock = "해당 정보가 아직 등록되지 않았습니다.\n";
+          // Fallback: 권장과목 데이터라도 제공
+          const subjectData = await querySubjectRecommendations(supabase, question);
+          if (subjectData && subjectData.length > 0) {
+            contextBlock = formatSubjectRecommendations(subjectData);
+            contextBlock += "\n\n> 참고: 전형 철학/평가 방식에 대한 상세 문서는 아직 등록되지 않았습니다. 위 권장과목 데이터를 참고하여 답변합니다.\n";
+          } else {
+            contextBlock = "해당 정보가 아직 등록되지 않았습니다.\n";
+          }
         }
         break;
       }
