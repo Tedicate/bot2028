@@ -651,7 +651,8 @@ serve(async (req) => {
 
     // ── DEBUG MODE: 모든 검색을 무조건 실행하고 결과를 사용자에게 표시 ──
     const { universityKeyword, departmentKeyword, admissionKeyword } = extractKeywords(question);
-    console.log(`[DEBUG] question="${question}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}", admKw="${admissionKeyword}"`);
+    const questionType = classifyQuestion(question);
+    console.log(`[DEBUG] question="${question}", type="${questionType}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}", admKw="${admissionKeyword}"`);
 
     // 1) admission_plans SQL
     let admissionPlansCount = 0;
