@@ -63,6 +63,9 @@ interface SuggestionData {
   admissionPool: string[];
   subjectPool: string[];
   loading: boolean;
+  admissionPlansCount: number;
+  universitySubjectsCount: number;
+  subjectsCount: number;
 }
 
 function useSuggestionData(): SuggestionData {
@@ -70,6 +73,9 @@ function useSuggestionData(): SuggestionData {
   const [admissionPool, setAdmissionPool] = useState<string[]>([]);
   const [subjectPool, setSubjectPool] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [admissionPlansCount, setAdmissionPlansCount] = useState(0);
+  const [universitySubjectsCount, setUniversitySubjectsCount] = useState(0);
+  const [subjectsCount, setSubjectsCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,70 +83,114 @@ function useSuggestionData(): SuggestionData {
     (async () => {
       setLoading(true);
 
+      const admissionQuery = supabase.from("admission_plans").select("*");
+      const universitySubjectsQuery = supabase
+        .from("university_subjects")
+        .select("*")
+        .limit(1000);
+      const subjectDescriptionsQuery = supabase.from("subject_descriptions").select("*");
+
       // Fetch all 3 sources in parallel
       const [deptResult, admResult, subResult] = await Promise.all([
-        supabase.from("university_subjects").select("university, department").limit(500),
-        supabase.from("admission_plans").select("university"),
-        supabase.from("subject_descriptions").select("subject_name"),
+        universitySubjectsQuery,
+        admissionQuery,
+        subjectDescriptionsQuery,
       ]);
 
       if (cancelled) return;
 
       // 1) [인기 학과] - university_subjects
       if (deptResult.error) {
-        console.error("[Suggestions] university_subjects 쿼리 에러:", deptResult.error);
-      } else if (deptResult.data && deptResult.data.length > 0) {
-        const uniquePairs = new Set<string>();
-        const suggestions: string[] = [];
-        for (const row of deptResult.data) {
-          const key = `${row.university}|${row.department}`;
-          if (!uniquePairs.has(key)) {
-            uniquePairs.add(key);
-            const shortUni = row.university.replace(/대학교$/, "대");
-            suggestions.push(`${shortUni} ${row.department}`);
-          }
-        }
-        const shuffled = [...suggestions].sort(() => Math.random() - 0.5).slice(0, 20);
-        setDeptPool(shuffled);
-        console.log(`[Suggestions] 인기 학과 풀: ${shuffled.length}개 (전체 ${suggestions.length}개 중)`);
+        console.error("[Suggestions] university_subjects 쿼리 에러:", deptResult.error, {
+          query: "from('university_subjects').select('*').limit(1000)",
+        });
       } else {
-        console.warn("[Suggestions] university_subjects 데이터 0건");
+        const rows = deptResult.data ?? [];
+        setUniversitySubjectsCount(rows.length);
+
+        if (rows.length > 0) {
+          const uniquePairs = new Set<string>();
+          const suggestions: string[] = [];
+          for (const row of rows) {
+            const key = `${row.university}|${row.department}`;
+            if (!uniquePairs.has(key)) {
+              uniquePairs.add(key);
+              const shortUni = row.university.replace(/대학교$/, "대");
+              suggestions.push(`${shortUni} ${row.department}`);
+            }
+          }
+          const shuffled = [...suggestions].sort(() => Math.random() - 0.5).slice(0, 20);
+          setDeptPool(shuffled);
+          console.log(`[Suggestions] 인기 학과 풀: ${shuffled.length}개 (전체 ${suggestions.length}개 중)`);
+        } else {
+          console.error("[Suggestions] university_subjects 데이터 0건", {
+            query: "from('university_subjects').select('*').limit(1000)",
+          });
+        }
       }
 
       // 2) [대학별 전형] - admission_plans (실제 데이터 있는 대학만)
       if (admResult.error) {
-        console.error("[Suggestions] admission_plans 쿼리 에러:", admResult.error);
-      } else if (admResult.data && admResult.data.length > 0) {
-        const unis = [...new Set(admResult.data.map((r) => r.university))];
-        const suggestions = unis.map((uni) => {
-          const shortUni = uni.replace(/대학교$/, "대");
-          return `2028 ${shortUni}`;
+        console.error("[Suggestions] admission_plans 쿼리 에러:", admResult.error, {
+          query: "from('admission_plans').select('*')",
         });
-        setAdmissionPool(suggestions);
-        console.log(`[Suggestions] 대학별 전형 풀: ${suggestions.length}개 — ${suggestions.join(", ")}`);
       } else {
-        console.warn("[Suggestions] admission_plans 데이터 0건");
+        const rows = admResult.data ?? [];
+        setAdmissionPlansCount(rows.length);
+
+        if (rows.length > 0) {
+          const unis = [...new Set(rows.map((r) => r.university))];
+          const suggestions = unis.map((uni) => {
+            const shortUni = uni.replace(/대학교$/, "대");
+            return `2028 ${shortUni}`;
+          });
+          setAdmissionPool(suggestions);
+          console.log(`[Suggestions] 대학별 전형 풀: ${suggestions.length}개 — ${suggestions.join(", ")}`);
+        } else {
+          console.error("[Suggestions] admission_plans 데이터 0건", {
+            query: "from('admission_plans').select('*')",
+          });
+        }
       }
 
       // 3) [과목 안내] - subject_descriptions
       if (subResult.error) {
-        console.error("[Suggestions] subject_descriptions 쿼리 에러:", subResult.error);
-      } else if (subResult.data && subResult.data.length > 0) {
-        const subjects = [...new Set(subResult.data.map((r) => r.subject_name))].filter(Boolean);
-        const shuffled = [...subjects].sort(() => Math.random() - 0.5).slice(0, 15);
-        setSubjectPool(shuffled);
-        console.log(`[Suggestions] 과목 안내 풀: ${shuffled.length}개 (전체 ${subjects.length}개 중)`);
+        console.error("[Suggestions] subject_descriptions 쿼리 에러:", subResult.error, {
+          query: "from('subject_descriptions').select('*')",
+        });
       } else {
-        console.warn("[Suggestions] subject_descriptions 데이터 0건");
+        const rows = subResult.data ?? [];
+        setSubjectsCount(rows.length);
+
+        if (rows.length > 0) {
+          const subjects = [...new Set(rows.map((r) => r.subject_name))].filter(Boolean);
+          const shuffled = [...subjects].sort(() => Math.random() - 0.5).slice(0, 15);
+          setSubjectPool(shuffled);
+          console.log(`[Suggestions] 과목 안내 풀: ${shuffled.length}개 (전체 ${subjects.length}개 중)`);
+        } else {
+          console.error("[Suggestions] subject_descriptions 데이터 0건", {
+            query: "from('subject_descriptions').select('*')",
+          });
+        }
       }
 
       setLoading(false);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { deptPool, admissionPool, subjectPool, loading };
+  return {
+    deptPool,
+    admissionPool,
+    subjectPool,
+    loading,
+    admissionPlansCount,
+    universitySubjectsCount,
+    subjectsCount,
+  };
 }
 
 export default function ChatBot() {
@@ -150,7 +200,15 @@ export default function ChatBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const { deptPool, admissionPool, subjectPool, loading: suggestionsLoading } = useSuggestionData();
+  const {
+    deptPool,
+    admissionPool,
+    subjectPool,
+    loading: suggestionsLoading,
+    admissionPlansCount,
+    universitySubjectsCount,
+    subjectsCount,
+  } = useSuggestionData();
 
   const goHome = () => {
     setMessages([]);
@@ -378,7 +436,7 @@ export default function ChatBot() {
 
               {/* Debug: 데이터 개수 표시 */}
               <p className="text-xs text-muted-foreground mb-3 font-mono bg-muted/50 px-3 py-1 rounded">
-                {JSON.stringify({ 전형안: admissionPool.length, 학과수: deptPool.length, 과목수: subjectPool.length, loading: suggestionsLoading })}
+                {JSON.stringify({ 전형안: admissionPlansCount, 학과수: universitySubjectsCount, 과목수: subjectsCount, loading: suggestionsLoading })}
               </p>
 
               <div className="w-full max-w-2xl grid grid-cols-3 gap-3 text-center">
