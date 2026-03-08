@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -57,80 +57,90 @@ function hasCheckboxLines(content: string): boolean {
   return content.split("\n").some((line) => CHECKBOX_LINE_RE.test(line));
 }
 
-// ── Dynamic data hooks ──
+// ── Dynamic suggestion data ──
+interface SuggestionData {
+  deptPool: string[];
+  admissionPool: string[];
+  subjectPool: string[];
+  loading: boolean;
+}
 
-// [인기 학과] - university_subjects에서 랜덤 20개 추출 → 6개 표시
-function useDynamicDeptSuggestions(): string[] {
-  const [pool, setPool] = useState<string[]>([]);
+function useSuggestionData(): SuggestionData {
+  const [deptPool, setDeptPool] = useState<string[]>([]);
+  const [admissionPool, setAdmissionPool] = useState<string[]>([]);
+  const [subjectPool, setSubjectPool] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    (async () => {
-      // Supabase doesn't support ORDER BY RANDOM(), so fetch all and shuffle client-side
-      const { data } = await supabase
-        .from("university_subjects")
-        .select("university, department");
-      if (!data || data.length === 0) return;
+    let cancelled = false;
 
-      // Get unique uni-dept pairs
-      const uniquePairs = new Set<string>();
-      const suggestions: string[] = [];
-      for (const row of data) {
-        const key = `${row.university}|${row.department}`;
-        if (!uniquePairs.has(key)) {
-          uniquePairs.add(key);
-          const shortUni = row.university.replace(/대학교$/, "대");
-          suggestions.push(`${shortUni} ${row.department}`);
+    (async () => {
+      setLoading(true);
+
+      // Fetch all 3 sources in parallel
+      const [deptResult, admResult, subResult] = await Promise.all([
+        supabase.from("university_subjects").select("university, department").limit(500),
+        supabase.from("admission_plans").select("university"),
+        supabase.from("subject_descriptions").select("subject_name"),
+      ]);
+
+      if (cancelled) return;
+
+      // 1) [인기 학과] - university_subjects
+      if (deptResult.error) {
+        console.error("[Suggestions] university_subjects 쿼리 에러:", deptResult.error);
+      } else if (deptResult.data && deptResult.data.length > 0) {
+        const uniquePairs = new Set<string>();
+        const suggestions: string[] = [];
+        for (const row of deptResult.data) {
+          const key = `${row.university}|${row.department}`;
+          if (!uniquePairs.has(key)) {
+            uniquePairs.add(key);
+            const shortUni = row.university.replace(/대학교$/, "대");
+            suggestions.push(`${shortUni} ${row.department}`);
+          }
         }
+        const shuffled = [...suggestions].sort(() => Math.random() - 0.5).slice(0, 20);
+        setDeptPool(shuffled);
+        console.log(`[Suggestions] 인기 학과 풀: ${shuffled.length}개 (전체 ${suggestions.length}개 중)`);
+      } else {
+        console.warn("[Suggestions] university_subjects 데이터 0건");
       }
 
-      // Shuffle and take 20 for rotating pool
-      const shuffled = suggestions.sort(() => Math.random() - 0.5).slice(0, 20);
-      setPool(shuffled);
+      // 2) [대학별 전형] - admission_plans (실제 데이터 있는 대학만)
+      if (admResult.error) {
+        console.error("[Suggestions] admission_plans 쿼리 에러:", admResult.error);
+      } else if (admResult.data && admResult.data.length > 0) {
+        const unis = [...new Set(admResult.data.map((r) => r.university))];
+        const suggestions = unis.map((uni) => {
+          const shortUni = uni.replace(/대학교$/, "대");
+          return `2028 ${shortUni}`;
+        });
+        setAdmissionPool(suggestions);
+        console.log(`[Suggestions] 대학별 전형 풀: ${suggestions.length}개 — ${suggestions.join(", ")}`);
+      } else {
+        console.warn("[Suggestions] admission_plans 데이터 0건");
+      }
+
+      // 3) [과목 안내] - subject_descriptions
+      if (subResult.error) {
+        console.error("[Suggestions] subject_descriptions 쿼리 에러:", subResult.error);
+      } else if (subResult.data && subResult.data.length > 0) {
+        const subjects = [...new Set(subResult.data.map((r) => r.subject_name))].filter(Boolean);
+        const shuffled = [...subjects].sort(() => Math.random() - 0.5).slice(0, 15);
+        setSubjectPool(shuffled);
+        console.log(`[Suggestions] 과목 안내 풀: ${shuffled.length}개 (전체 ${subjects.length}개 중)`);
+      } else {
+        console.warn("[Suggestions] subject_descriptions 데이터 0건");
+      }
+
+      setLoading(false);
     })();
+
+    return () => { cancelled = true; };
   }, []);
-  return pool;
-}
 
-// [대학별 전형] - admission_plans에서 실제 데이터 있는 대학만
-function useDynamicAdmissionSuggestions(): string[] {
-  const [pool, setPool] = useState<string[]>([]);
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("admission_plans")
-        .select("university");
-      if (!data || data.length === 0) return;
-
-      // Unique universities from admission_plans only
-      const unis = [...new Set(data.map((r) => r.university))];
-      const suggestions = unis.map((uni) => {
-        const shortUni = uni.replace(/대학교$/, "대");
-        return `2028 ${shortUni}`;
-      });
-
-      setPool(suggestions);
-    })();
-  }, []);
-  return pool;
-}
-
-// [과목 안내] - subject_descriptions에서 랜덤 15개 추출 → 5개 표시
-function useDynamicSubjectSuggestions(): string[] {
-  const [pool, setPool] = useState<string[]>([]);
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("subject_descriptions")
-        .select("subject_name");
-      if (!data || data.length === 0) return;
-
-      // Unique subject names
-      const subjects = [...new Set(data.map((r) => r.subject_name))].filter(Boolean);
-      // Shuffle and take 15 for rotating pool
-      const shuffled = subjects.sort(() => Math.random() - 0.5).slice(0, 15);
-      setPool(shuffled);
-    })();
-  }, []);
-  return pool;
+  return { deptPool, admissionPool, subjectPool, loading };
 }
 
 export default function ChatBot() {
@@ -140,9 +150,7 @@ export default function ChatBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const deptPool = useDynamicDeptSuggestions();
-  const admissionPool = useDynamicAdmissionSuggestions();
-  const subjectPool = useDynamicSubjectSuggestions();
+  const { deptPool, admissionPool, subjectPool, loading: suggestionsLoading } = useSuggestionData();
 
   const goHome = () => {
     setMessages([]);
@@ -371,71 +379,86 @@ export default function ChatBot() {
               <div className="w-full max-w-2xl grid grid-cols-3 gap-3 text-center">
                 {/* Headers */}
                 <p className="text-xs font-semibold text-muted-foreground px-1">🎓 인기 학과</p>
-                <p className="text-xs font-semibold text-muted-foreground px-1">📚 주요 과목</p>
+                <p className="text-xs font-semibold text-muted-foreground px-1">📚 과목 안내</p>
                 <p className="text-xs font-semibold text-muted-foreground px-1">📋 대학별 전형</p>
 
-                {/* Column: 인기 학과 */}
-                <div className="flex flex-col gap-2">
-                  <AnimatePresence mode="popLayout">
-                    {deptSuggestions.map((s) => {
-                      const parts = s.match(/^(.+?)\s+(.+)$/);
-                      return (
-                        <motion.button
-                          key={s}
-                          layout
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.35, ease: "easeOut" }}
-                          onClick={() => send(s)}
-                          className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors leading-tight"
-                        >
-                          {parts ? (<>{parts[1]}<br />{parts[2]}</>) : s}
-                        </motion.button>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-
-                {/* Column: 주요 과목 */}
-                <div className="flex flex-col gap-2">
-                  <AnimatePresence mode="popLayout">
-                    {subjectSuggestions.map((s: string) => (
-                      <motion.button
-                        key={s}
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.35, ease: "easeOut" }}
-                        onClick={() => send(s)}
-                        className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                      >
-                        {s}
-                      </motion.button>
+                {suggestionsLoading ? (
+                  <>
+                    {/* Skeleton columns */}
+                    {[6, 5, 3].map((count, colIdx) => (
+                      <div key={colIdx} className="flex flex-col gap-2">
+                        {Array.from({ length: count }).map((_, i) => (
+                          <div key={i} className="h-10 rounded-xl bg-muted animate-pulse" />
+                        ))}
+                      </div>
                     ))}
-                  </AnimatePresence>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Column: 인기 학과 */}
+                    <div className="flex flex-col gap-2">
+                      <AnimatePresence mode="popLayout">
+                        {deptSuggestions.map((s) => {
+                          const parts = s.match(/^(.+?)\s+(.+)$/);
+                          return (
+                            <motion.button
+                              key={s}
+                              layout
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.8 }}
+                              transition={{ duration: 0.35, ease: "easeOut" }}
+                              onClick={() => send(s)}
+                              className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors leading-tight"
+                            >
+                              {parts ? (<>{parts[1]}<br />{parts[2]}</>) : s}
+                            </motion.button>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
 
-                {/* Column: 대학별 전형 */}
-                <div className="flex flex-col gap-2">
-                  <AnimatePresence mode="popLayout">
-                    {admissionSuggestions.map((s) => (
-                      <motion.button
-                        key={s}
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.35, ease: "easeOut" }}
-                        onClick={() => send(s)}
-                        className="px-3 py-2 rounded-xl bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                      >
-                        {s}
-                      </motion.button>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                    {/* Column: 과목 안내 */}
+                    <div className="flex flex-col gap-2">
+                      <AnimatePresence mode="popLayout">
+                        {subjectSuggestions.map((s: string) => (
+                          <motion.button
+                            key={s}
+                            layout
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                            onClick={() => send(s)}
+                            className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                          >
+                            {s}
+                          </motion.button>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Column: 대학별 전형 */}
+                    <div className="flex flex-col gap-2">
+                      <AnimatePresence mode="popLayout">
+                        {admissionSuggestions.map((s) => (
+                          <motion.button
+                            key={s}
+                            layout
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                            onClick={() => send(s)}
+                            className="px-3 py-2 rounded-xl bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                          >
+                            {s}
+                          </motion.button>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
