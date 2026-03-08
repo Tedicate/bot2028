@@ -261,8 +261,8 @@ const ADMISSION_TYPE_ALIASES: Record<string, string> = {
 // 전형 관련 키워드 목록 (department로 취급하면 안 되는 단어들)
 const ADMISSION_KEYWORDS_SET = new Set([
   "학종", "학생부종합", "학생부종합전형", "교과", "학생부교과", "학생부교과전형",
-  "논술", "논술위주전형", "정시", "수능위주전형", "수능", "전형",
-  "수시", "종합전형", "교과전형",
+  "논술", "논술위주전형", "정시", "수능위주전형", "수능", "전형", "전형안",
+  "수시", "종합전형", "교과전형", "2028",
 ]);
 
 // Extract university, department, and admission type keywords from question text
