@@ -612,7 +612,7 @@ serve(async (req) => {
       const embedding = await getEmbedding(GEMINI_API_KEY, question);
       embeddingSuccess = !!embedding;
       if (embedding) {
-        documentsData = await vectorSearchDocuments(supabase, embedding);
+        documentsData = await vectorSearchDocuments(supabase, embedding, universityKeyword);
         documentsCount = documentsData?.length ?? 0;
       } else {
         documentsError = "임베딩 생성 실패";
