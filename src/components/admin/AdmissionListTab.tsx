@@ -103,7 +103,24 @@ export default function AdmissionListTab() {
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-card">
               <tr className="border-b text-left text-muted-foreground">
-                <th className="p-2 w-8"></th>
+                <th className="p-2 w-8">
+                  <div
+                    onClick={() => {
+                      if (selectedIds.size === docs.length) {
+                        setSelectedIds(new Set());
+                      } else {
+                        setSelectedIds(new Set(docs.map((d) => d.id)));
+                      }
+                    }}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer ${selectedIds.size === docs.length && docs.length > 0 ? "bg-primary border-primary" : "border-muted-foreground/30"}`}
+                  >
+                    {selectedIds.size === docs.length && docs.length > 0 && (
+                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </th>
                 <th className="p-2">대학</th>
                 <th className="p-2">연도</th>
                 <th className="p-2">문서유형</th>
