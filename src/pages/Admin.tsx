@@ -88,51 +88,31 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [signUpSuccess, setSignUpSuccess] = useState(false);
 
   const translateError = (msg: string) => {
     if (msg.includes("Invalid login credentials")) return "이메일 또는 비밀번호가 올바르지 않습니다.";
-    if (msg.includes("Email not confirmed")) return "이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.";
-    if (msg.includes("User already registered")) return "이미 가입된 이메일입니다.";
-    if (msg.includes("Password should be at least")) return "비밀번호는 최소 6자 이상이어야 합니다.";
-    if (msg.includes("Unable to validate email")) return "올바른 이메일 형식을 입력해주세요.";
+    if (msg.includes("Email not confirmed")) return "이메일 인증이 완료되지 않았습니다.";
     return msg;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSignUpSuccess(false);
-
-    if (isSignUp) {
-      const { error: authError } = await supabase.auth.signUp({ email, password });
-      if (authError) {
-        setError(translateError(authError.message));
-      } else {
-        setSignUpSuccess(true);
-      }
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      setError(translateError(authError.message));
       setLoading(false);
     } else {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) {
-        setError(translateError(authError.message));
-        setLoading(false);
-      } else {
-        onLogin();
-      }
+      onLogin();
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm space-y-4">
-        <h2 className="text-lg font-bold text-center text-foreground">🔒 관리자 {isSignUp ? "회원가입" : "로그인"}</h2>
+      <form onSubmit={handleLogin} className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm space-y-4">
+        <h2 className="text-lg font-bold text-center text-foreground">🔒 관리자 로그인</h2>
         {error && <p className="text-xs text-destructive text-center">{error}</p>}
-        {signUpSuccess && (
-          <p className="text-xs text-green-600 text-center">가입 완료! 이메일 인증 후 로그인해주세요.</p>
-        )}
         <input
           type="email"
           value={email}
@@ -145,7 +125,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="비밀번호 (최소 6자)"
+          placeholder="비밀번호"
           className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           required
         />
@@ -154,14 +134,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
           disabled={loading}
           className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
         >
-          {loading ? "처리 중..." : isSignUp ? "회원가입" : "로그인"}
-        </button>
-        <button
-          type="button"
-          onClick={() => { setIsSignUp(!isSignUp); setError(""); setSignUpSuccess(false); }}
-          className="w-full text-xs text-muted-foreground hover:text-foreground underline"
-        >
-          {isSignUp ? "이미 계정이 있으신가요? 로그인" : "계정이 없으신가요? 회원가입"}
+          {loading ? "로그인 중..." : "로그인"}
         </button>
       </form>
     </div>
