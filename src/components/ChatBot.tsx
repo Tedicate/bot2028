@@ -200,7 +200,15 @@ export default function ChatBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const { deptPool, admissionPool, subjectPool, loading: suggestionsLoading } = useSuggestionData();
+  const {
+    deptPool,
+    admissionPool,
+    subjectPool,
+    loading: suggestionsLoading,
+    admissionPlansCount,
+    universitySubjectsCount,
+    subjectsCount,
+  } = useSuggestionData();
 
   const goHome = () => {
     setMessages([]);
