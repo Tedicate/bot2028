@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // ── Question type classification ──
-type QuestionType = "subject_recommendation" | "admission_plan" | "subject_description" | "admission_philosophy" | "general";
+type QuestionType = "university_only" | "subject_recommendation" | "admission_plan" | "subject_description" | "admission_philosophy" | "general";
 
 function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
@@ -41,8 +41,20 @@ function classifyQuestion(text: string): QuestionType {
   const hasUniversityPattern = /대학?교?|대$/.test(lower);
   const hasDepartmentPattern = /학과|학부|계열|전공|예과/.test(lower);
 
-  if (hasUniversityPattern || hasDepartmentPattern) {
+  // University-only: has university name but no department, no admission keyword, no other specific intent
+  if (hasUniversityPattern && !hasDepartmentPattern) {
+    return "university_only";
+  }
+
+  if (hasDepartmentPattern) {
     return "subject_recommendation";
+  }
+
+  // Check if input is just a known university alias (e.g. "중앙대", "서울대")
+  const trimmed = text.trim();
+  const KNOWN_UNI_ALIASES = Object.keys(UNIVERSITY_ALIASES);
+  if (KNOWN_UNI_ALIASES.some(alias => trimmed === alias || trimmed === alias + "학교")) {
+    return "university_only";
   }
 
   return "general";
@@ -110,6 +122,23 @@ const SYSTEM_PROMPT = `당신은 2028 대학입시를 준비하는 한국 고등
 
 사용자의 질문 유형에 따라 시스템이 자동으로 관련 데이터를 조회하여 제공합니다.
 제공된 데이터를 기반으로 정확하고 친절하게 답변하세요.
+
+### 유형 0: 대학명만 입력 (학과/전형/과목 지정 없이 "중앙대", "서울대" 등만 입력한 경우)
+사용자가 대학명만 단독으로 입력하면, 무엇이 궁금한지 물어보며 선택지를 SUGGEST 버튼으로 제시하세요.
+
+예시 답변:
+👋 **중앙대학교**에 대해 알아보고 싶으신가요?
+
+궁금한 내용을 선택해주세요! 👇
+
+<!--SUGGEST:중앙대 2028 전형안-->
+<!--SUGGEST:중앙대 컴퓨터공학부 권장과목-->
+<!--SUGGEST:중앙대 경영학과 권장과목-->
+<!--SUGGEST:중앙대 학생부종합전형-->
+
+- 대학명만 입력된 경우 절대로 바로 상세 정보를 내보내지 마세요.
+- 반드시 "전형안 보기", "학과별 권장과목 보기" 등의 선택지를 먼저 제시하세요.
+- 해당 대학의 데이터가 없더라도 일단 선택지를 제시하고, 사용자가 선택한 후에 데이터 유무를 판단하세요.
 
 ### 유형 1: 학과별 권장과목 (university_subjects 데이터 제공)
 사용자가 학과명 또는 대학+학과를 입력하면 DB에서 조회한 권장과목 데이터가 제공됩니다.
@@ -622,7 +651,8 @@ serve(async (req) => {
 
     // ── DEBUG MODE: 모든 검색을 무조건 실행하고 결과를 사용자에게 표시 ──
     const { universityKeyword, departmentKeyword, admissionKeyword } = extractKeywords(question);
-    console.log(`[DEBUG] question="${question}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}", admKw="${admissionKeyword}"`);
+    const questionType = classifyQuestion(question);
+    console.log(`[DEBUG] question="${question}", type="${questionType}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}", admKw="${admissionKeyword}"`);
 
     // 1) admission_plans SQL
     let admissionPlansCount = 0;
@@ -678,6 +708,13 @@ serve(async (req) => {
 
     // 컨텍스트 블록 조합 (찾은 데이터 모두 포함)
     let contextBlock = debugLog + "\n---\n\n";
+
+    // University-only: prompt the bot to ask what the user wants
+    if (questionType === "university_only" && universityKeyword) {
+      contextBlock += `## ⚠️ 사용자가 "${universityKeyword}" 대학명만 입력했습니다.\n`;
+      contextBlock += `바로 상세 정보를 제공하지 말고, "유형 0: 대학명만 입력" 규칙에 따라 무엇이 궁금한지 SUGGEST 버튼으로 선택지를 제시하세요.\n`;
+      contextBlock += `예: 전형안 보기, 학과별 권장과목 보기 등\n\n`;
+    }
 
     if (documentsData && documentsData.length > 0) {
       contextBlock += `## ⚠️ 아래 문서 데이터가 검색되었습니다. 반드시 이 내용을 기반으로 답변하세요.\n\n`;
