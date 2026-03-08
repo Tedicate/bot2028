@@ -358,6 +358,28 @@ export default function ChatBot() {
                   </AnimatePresence>
                 </div>
               </div>
+
+              <div className="w-full max-w-md">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📋 대학별 전형안</p>
+                <div className="flex flex-wrap gap-2 min-h-[66px]">
+                  <AnimatePresence mode="popLayout">
+                    {admissionSuggestions.map((s) => (
+                      <motion.button
+                        key={s}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        onClick={() => send(s)}
+                        className="px-4 py-2 rounded-full bg-accent text-accent-foreground text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {s}
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
             </motion.div>
           )}
 
