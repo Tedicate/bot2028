@@ -5,14 +5,11 @@ import ReactMarkdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
-import { supabase } from "@/integrations/supabase/client";
-
 type Msg = { role: "user" | "assistant"; content: string };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
-const EMBED_URL = `${SUPABASE_URL}/functions/v1/gemini-embed`;
-const CHAT_URL = `${SUPABASE_URL}/functions/v1/gemini-chat`;
+const ADVISOR_URL = `${SUPABASE_URL}/functions/v1/course-advisor`;
 
 const ALL_DEPT_SUGGESTIONS = [
   "서울대 컴퓨터공학부", "고려대 전기전자공학부", "경희대 간호학과",
