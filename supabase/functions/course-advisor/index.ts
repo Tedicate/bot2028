@@ -709,6 +709,13 @@ serve(async (req) => {
     // 컨텍스트 블록 조합 (찾은 데이터 모두 포함)
     let contextBlock = debugLog + "\n---\n\n";
 
+    // University-only: prompt the bot to ask what the user wants
+    if (questionType === "university_only" && universityKeyword) {
+      contextBlock += `## ⚠️ 사용자가 "${universityKeyword}" 대학명만 입력했습니다.\n`;
+      contextBlock += `바로 상세 정보를 제공하지 말고, "유형 0: 대학명만 입력" 규칙에 따라 무엇이 궁금한지 SUGGEST 버튼으로 선택지를 제시하세요.\n`;
+      contextBlock += `예: 전형안 보기, 학과별 권장과목 보기 등\n\n`;
+    }
+
     if (documentsData && documentsData.length > 0) {
       contextBlock += `## ⚠️ 아래 문서 데이터가 검색되었습니다. 반드시 이 내용을 기반으로 답변하세요.\n\n`;
       contextBlock += formatVectorResults(documentsData, "관련 문서 (벡터 검색)");
