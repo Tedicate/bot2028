@@ -12,12 +12,6 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 const ADVISOR_URL = `${SUPABASE_URL}/functions/v1/course-advisor`;
 
-const ALL_SUBJECT_SUGGESTIONS = [
-  "미적분II", "기하", "확률과 통계", "물리학", "화학",
-  "생명과학", "역학과 에너지", "정보", "인공지능 기초",
-  "데이터 과학", "세포와 물질대사", "생물의 유전",
-];
-
 function shuffleAndPick<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
@@ -64,56 +58,76 @@ function hasCheckboxLines(content: string): boolean {
 }
 
 // ── Dynamic data hooks ──
+
+// [인기 학과] - university_subjects에서 랜덤 20개 추출 → 6개 표시
 function useDynamicDeptSuggestions(): string[] {
   const [pool, setPool] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
+      // Supabase doesn't support ORDER BY RANDOM(), so fetch all and shuffle client-side
       const { data } = await supabase
         .from("university_subjects")
-        .select("university, department, region");
+        .select("university, department");
       if (!data || data.length === 0) return;
 
-      // Build unique uni-dept pairs grouped by region
-      const uniDepts: Record<string, { depts: Set<string>; region: string }> = {};
+      // Get unique uni-dept pairs
+      const uniquePairs = new Set<string>();
+      const suggestions: string[] = [];
       for (const row of data) {
-        if (!uniDepts[row.university]) uniDepts[row.university] = { depts: new Set(), region: row.region };
-        uniDepts[row.university].depts.add(row.department);
-      }
-
-      // Generate all possible "대학 학과" combinations
-      const allSuggestions: string[] = [];
-      for (const [uni, info] of Object.entries(uniDepts)) {
-        const shortUni = uni.replace(/대학교$/, "대");
-        for (const dept of info.depts) {
-          allSuggestions.push(`${shortUni} ${dept}`);
+        const key = `${row.university}|${row.department}`;
+        if (!uniquePairs.has(key)) {
+          uniquePairs.add(key);
+          const shortUni = row.university.replace(/대학교$/, "대");
+          suggestions.push(`${shortUni} ${row.department}`);
         }
       }
 
-      // Shuffle and take up to 30 for a rich rotating pool
-      const shuffled = allSuggestions.sort(() => Math.random() - 0.5).slice(0, 30);
+      // Shuffle and take 20 for rotating pool
+      const shuffled = suggestions.sort(() => Math.random() - 0.5).slice(0, 20);
       setPool(shuffled);
     })();
   }, []);
   return pool;
 }
 
+// [대학별 전형] - admission_plans에서 실제 데이터 있는 대학만
 function useDynamicAdmissionSuggestions(): string[] {
   const [pool, setPool] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
-      // Use university_subjects for richer university list
       const { data } = await supabase
-        .from("university_subjects")
+        .from("admission_plans")
         .select("university");
       if (!data || data.length === 0) return;
 
+      // Unique universities from admission_plans only
       const unis = [...new Set(data.map((r) => r.university))];
       const suggestions = unis.map((uni) => {
         const shortUni = uni.replace(/대학교$/, "대");
         return `2028 ${shortUni}`;
       });
 
-      setPool(suggestions.sort(() => Math.random() - 0.5));
+      setPool(suggestions);
+    })();
+  }, []);
+  return pool;
+}
+
+// [과목 안내] - subject_descriptions에서 랜덤 15개 추출 → 5개 표시
+function useDynamicSubjectSuggestions(): string[] {
+  const [pool, setPool] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("subject_descriptions")
+        .select("subject_name");
+      if (!data || data.length === 0) return;
+
+      // Unique subject names
+      const subjects = [...new Set(data.map((r) => r.subject_name))].filter(Boolean);
+      // Shuffle and take 15 for rotating pool
+      const shuffled = subjects.sort(() => Math.random() - 0.5).slice(0, 15);
+      setPool(shuffled);
     })();
   }, []);
   return pool;
