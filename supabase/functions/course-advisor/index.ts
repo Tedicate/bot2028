@@ -257,9 +257,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     // Fallback: university only
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('university', `%${universityKeyword}%`)
-      .eq('year', 2028)
       .limit(30);
 
     if (fallbackError) console.error('폴백 쿼리 에러:', fallbackError);
