@@ -212,8 +212,38 @@ ${COURSE_DESCRIPTIONS}
 
 // ── DB query helpers ──
 
-// Extract university and department keywords from question text
-function extractKeywords(question: string): { universityKeyword: string; departmentKeyword: string } {
+// ── 대입 전용 동의어/줄임말 사전 ──
+const UNIVERSITY_ALIASES: Record<string, string> = {
+  "건대": "건국대학교", "설대": "서울대학교", "서울대": "서울대학교",
+  "경희대": "경희대학교", "고대": "고려대학교", "연대": "연세대학교",
+  "중대": "중앙대학교", "한대": "한양대학교", "성대": "성균관대학교",
+  "서강대": "서강대학교", "이대": "이화여자대학교", "숙대": "숙명여자대학교",
+  "동대": "동국대학교", "홍대": "홍익대학교", "국대": "국민대학교",
+  "숭대": "숭실대학교", "세대": "세종대학교", "광대": "광운대학교",
+  "단대": "단국대학교", "인대": "인하대학교", "아대": "아주대학교",
+  "건국대": "건국대학교", "고려대": "고려대학교", "연세대": "연세대학교",
+  "중앙대": "중앙대학교", "한양대": "한양대학교", "성균관대": "성균관대학교",
+  "동국대": "동국대학교", "홍익대": "홍익대학교", "국민대": "국민대학교",
+  "숭실대": "숭실대학교", "세종대": "세종대학교", "광운대": "광운대학교",
+  "단국대": "단국대학교", "인하대": "인하대학교", "아주대": "아주대학교",
+  "가천대": "가천대학교", "명지대": "명지대학교", "상명대": "상명대학교",
+};
+
+const ADMISSION_TYPE_ALIASES: Record<string, string> = {
+  "학종": "학생부종합전형", "학생부종합": "학생부종합전형",
+  "교과": "학생부교과전형", "학생부교과": "학생부교과전형",
+  "논술": "논술위주전형", "정시": "수능위주전형", "수능": "수능위주전형",
+};
+
+// 전형 관련 키워드 목록 (department로 취급하면 안 되는 단어들)
+const ADMISSION_KEYWORDS_SET = new Set([
+  "학종", "학생부종합", "학생부종합전형", "교과", "학생부교과", "학생부교과전형",
+  "논술", "논술위주전형", "정시", "수능위주전형", "수능", "전형",
+  "수시", "종합전형", "교과전형",
+]);
+
+// Extract university, department, and admission type keywords from question text
+function extractKeywords(question: string): { universityKeyword: string; departmentKeyword: string; admissionKeyword: string } {
   // Known university name stems (without 대/대학/대학교 suffix)
   const KNOWN_UNIVERSITIES = [
     "서울", "고려", "연세", "경희", "중앙", "한양", "성균관", "서강", "이화",
@@ -223,35 +253,71 @@ function extractKeywords(question: string): { universityKeyword: string; departm
     "한국항공", "서울과학기술", "한국교통", "단국", "가천", "덕성",
   ];
 
-  const words = question.split(/\s+/).filter(w => w.length >= 2);
-  let universityKeyword = "";
+  // Step 0: 줄임말 사전을 먼저 적용하여 정식 명칭으로 변환
+  let normalizedQuestion = question;
+  
+  // 대학명 줄임말 → 정식 명칭 (긴 것부터 매칭)
+  const sortedUniAliases = Object.entries(UNIVERSITY_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  let resolvedUniversity = "";
+  for (const [alias, fullName] of sortedUniAliases) {
+    if (normalizedQuestion.includes(alias)) {
+      resolvedUniversity = fullName;
+      normalizedQuestion = normalizedQuestion.replace(alias, "");
+      break;
+    }
+  }
+
+  // 전형명 줄임말 → 정식 명칭 (긴 것부터 매칭)
+  let resolvedAdmission = "";
+  const sortedAdmAliases = Object.entries(ADMISSION_TYPE_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  for (const [alias, fullName] of sortedAdmAliases) {
+    if (normalizedQuestion.includes(alias)) {
+      resolvedAdmission = fullName;
+      normalizedQuestion = normalizedQuestion.replace(alias, "");
+      break;
+    }
+  }
+
+  const words = normalizedQuestion.split(/\s+/).filter(w => w.length >= 1);
+  let universityKeyword = resolvedUniversity ? resolvedUniversity.replace(/(대학교|대학|대)$/g, "").trim() : "";
+  let admissionKeyword = resolvedAdmission;
   const departmentCandidates: string[] = [];
 
   for (const word of words) {
+    if (!word.trim()) continue;
+    
+    // 전형 관련 키워드는 admissionKeyword로 분류 (절대 department로 안 감)
+    if (ADMISSION_KEYWORDS_SET.has(word)) {
+      if (!admissionKeyword) {
+        admissionKeyword = ADMISSION_TYPE_ALIASES[word] || word;
+      }
+      continue;
+    }
+
     if (/대학교|대학|대$/.test(word)) {
-      // Strip university suffixes for broader matching
-      universityKeyword = word.replace(/(대학교|대학|대)$/g, "").trim() || word;
+      if (!universityKeyword) {
+        universityKeyword = word.replace(/(대학교|대학|대)$/g, "").trim() || word;
+      }
     } else if (/학과|학부|계열|전공|예과|과$/.test(word)) {
       const stripped = word.replace(/(학과|학부|계열|전공|예과|과)$/g, "").trim();
       if (stripped) departmentCandidates.push(stripped);
-    } else if (!/권장|추천|과목|알려|어떤|정보|보여|상세/.test(word)) {
-      // Check if this word is a known university name without suffix
+    } else if (!/권장|추천|과목|알려|어떤|정보|보여|상세|평가|방식|철학|인재상|기준|에|대해|줘|해|알려줘|대해서/.test(word)) {
       if (!universityKeyword && KNOWN_UNIVERSITIES.some(u => word.includes(u) || u.includes(word))) {
         universityKeyword = word;
-      } else {
+      } else if (word.length >= 2) {
         departmentCandidates.push(word);
       }
     }
   }
 
-  // If still no university but we have 2+ candidates, heuristic: first might be university
-  if (!universityKeyword && departmentCandidates.length >= 2) {
+  // If still no university but we have 2+ candidates AND no admission keyword, heuristic: first might be university
+  if (!universityKeyword && !admissionKeyword && departmentCandidates.length >= 2) {
     const first = departmentCandidates.shift()!;
     universityKeyword = first;
   }
 
   const departmentKeyword = departmentCandidates[0] || "";
-  return { universityKeyword, departmentKeyword };
+  return { universityKeyword, departmentKeyword, admissionKeyword };
 }
 
 async function querySubjectRecommendations(supabase: any, question: string) {
