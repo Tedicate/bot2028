@@ -690,6 +690,10 @@ serve(async (req) => {
 
     (async () => {
       try {
+        // 디버그 로그를 SSE 스트림 맨 앞에 직접 주입
+        const debugChunk = { choices: [{ delta: { content: debugLog + "\n---\n\n" } }] };
+        await writer.write(encoder.encode(`data: ${JSON.stringify(debugChunk)}\n\n`));
+
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
