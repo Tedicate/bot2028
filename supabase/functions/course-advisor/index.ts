@@ -386,19 +386,27 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   return data && data.length > 0 ? data : null;
 }
 
+// 일반적인(필터링에 무의미한) 전형 키워드
+const GENERIC_ADMISSION_WORDS = new Set([
+  "전형", "방식", "평가", "선발", "입시", "입학", "모집", "원서",
+]);
+
 async function queryAdmissionPlans(supabase: any, question: string, universityKw: string, admissionKw: string) {
+  // admissionKw가 일반 단어면 필터에서 제외
+  const effectiveAdmKw = admissionKw && !GENERIC_ADMISSION_WORDS.has(admissionKw) ? admissionKw : "";
+
   // Build query with extracted keywords
   let query = supabase.from("admission_plans").select("*");
 
   if (universityKw) {
     query = query.ilike("university", `%${universityKw}%`);
   }
-  if (admissionKw) {
-    query = query.ilike("admission_type", `%${admissionKw}%`);
+  if (effectiveAdmKw) {
+    query = query.ilike("admission_type", `%${effectiveAdmKw}%`);
   }
 
   // If no keywords extracted, fallback to word-based search
-  if (!universityKw && !admissionKw) {
+  if (!universityKw && !effectiveAdmKw) {
     const words = question.split(/\s+/).filter(w => w.length >= 2);
     if (words.length === 0) return null;
     const orFilters = words.map(w => `university.ilike.%${w}%`).join(",");
@@ -410,6 +418,22 @@ async function queryAdmissionPlans(supabase: any, question: string, universityKw
   if (error) {
     console.error("admission_plans query error:", error);
     return null;
+  }
+
+  // Fallback: admissionKw 조건으로 0건이면 대학명만으로 재검색
+  if ((!data || data.length === 0) && effectiveAdmKw && universityKw) {
+    console.log(`[admission_plans] 0건 → admissionKw 제거 후 대학명(${universityKw})만으로 재검색`);
+    const { data: fallbackData, error: fbErr } = await supabase
+      .from("admission_plans")
+      .select("*")
+      .ilike("university", `%${universityKw}%`)
+      .order("university")
+      .limit(50);
+    if (fbErr) {
+      console.error("admission_plans fallback error:", fbErr);
+      return null;
+    }
+    return fallbackData && fallbackData.length > 0 ? fallbackData : null;
   }
 
   return data && data.length > 0 ? data : null;
@@ -430,11 +454,11 @@ async function vectorSearchSubjectDescriptions(supabase: any, embedding: number[
   return data;
 }
 
-async function vectorSearchDocuments(supabase: any, embedding: number[]) {
+async function vectorSearchDocuments(supabase: any, embedding: number[], universityKw?: string) {
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
     match_threshold: 0.4,
-    match_count: 8,
+    match_count: 15, // fetch more to allow post-filtering
   });
 
   if (error) {
@@ -442,8 +466,20 @@ async function vectorSearchDocuments(supabase: any, embedding: number[]) {
     return null;
   }
 
-  console.log(`[documents] match_documents results: ${data?.length ?? 0}`);
-  return data;
+  let results = data || [];
+
+  // Post-filter by university metadata if keyword exists
+  if (universityKw && results.length > 0) {
+    const filtered = results.filter((d: any) => {
+      const docUni = d.metadata?.university || "";
+      return docUni.includes(universityKw);
+    });
+    console.log(`[documents] university filter "${universityKw}": ${results.length} → ${filtered.length}`);
+    results = filtered.length > 0 ? filtered : results.slice(0, 3); // fallback to top 3 if nothing matches
+  }
+
+  console.log(`[documents] final results: ${results.length}`);
+  return results.length > 0 ? results.slice(0, 8) : null;
 }
 
 async function getEmbedding(apiKey: string, text: string): Promise<number[] | null> {
@@ -576,7 +612,7 @@ serve(async (req) => {
       const embedding = await getEmbedding(GEMINI_API_KEY, question);
       embeddingSuccess = !!embedding;
       if (embedding) {
-        documentsData = await vectorSearchDocuments(supabase, embedding);
+        documentsData = await vectorSearchDocuments(supabase, embedding, universityKeyword);
         documentsCount = documentsData?.length ?? 0;
       } else {
         documentsError = "임베딩 생성 실패";
