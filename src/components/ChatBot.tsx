@@ -376,6 +376,11 @@ export default function ChatBot() {
                 예: "서울대 컴퓨터공학부" 또는 "미적분II"
               </p>
 
+              {/* Debug: 데이터 개수 표시 */}
+              <p className="text-xs text-muted-foreground mb-3 font-mono bg-muted/50 px-3 py-1 rounded">
+                {JSON.stringify({ 전형안: admissionPool.length, 학과수: deptPool.length, 과목수: subjectPool.length, loading: suggestionsLoading })}
+              </p>
+
               <div className="w-full max-w-2xl grid grid-cols-3 gap-3 text-center">
                 {/* Headers */}
                 <p className="text-xs font-semibold text-muted-foreground px-1">🎓 인기 학과</p>
