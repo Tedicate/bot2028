@@ -459,12 +459,6 @@ export default function ChatBot() {
                     </div>
                   </>
                 )}
-                      >
-                        {s}
-                      </motion.button>
-                    ))}
-                  </AnimatePresence>
-                </div>
               </div>
             </motion.div>
           )}
