@@ -436,7 +436,7 @@ export default function ChatBot() {
 
               {/* Debug: 데이터 개수 표시 */}
               <p className="text-xs text-muted-foreground mb-3 font-mono bg-muted/50 px-3 py-1 rounded">
-                {JSON.stringify({ 전형안: admissionPool.length, 학과수: deptPool.length, 과목수: subjectPool.length, loading: suggestionsLoading })}
+                {JSON.stringify({ 전형안: admissionPlansCount, 학과수: universitySubjectsCount, 과목수: subjectsCount, loading: suggestionsLoading })}
               </p>
 
               <div className="w-full max-w-2xl grid grid-cols-3 gap-3 text-center">
