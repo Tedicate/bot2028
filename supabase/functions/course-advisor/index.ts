@@ -360,8 +360,8 @@ function formatSubjectRecommendations(data: any[]): string {
   for (const row of data) {
     const key = `${row.university}|${row.department}`;
     if (!grouped[key]) grouped[key] = { core: [], recommended: [] };
-    if (row.is_core) grouped[key].core.push(row.subject);
-    if (row.is_recommended) grouped[key].recommended.push(row.subject);
+    if (row.is_core) grouped[key].recommended.push(row.subject);
+    if (row.is_recommended) grouped[key].core.push(row.subject);
   }
 
   const lines: string[] = ["## 조회된 대학별 권장과목 데이터\n"];
