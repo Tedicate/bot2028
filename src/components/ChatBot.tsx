@@ -98,6 +98,7 @@ export default function ChatBot() {
   };
   const deptSuggestions = useRotatingSuggestions(ALL_DEPT_SUGGESTIONS, 8, 3000);
   const subjectSuggestions = useRotatingSuggestions(ALL_SUBJECT_SUGGESTIONS, 8, 3000);
+  const admissionSuggestions = useRotatingSuggestions(ALL_ADMISSION_SUGGESTIONS, 6, 4000);
 
   useEffect(() => {
     if (messages.length > 0) {
