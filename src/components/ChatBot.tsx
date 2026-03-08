@@ -19,7 +19,11 @@ const ALL_ADMISSION_SUGGESTIONS = [
   "서울대 2028 전형안", "경희대 2028 전형안", "건국대 2028 전형안",
 ];
 
-const ALL_SUBJECT_SUGGESTIONS: string[] = [];
+const ALL_SUBJECT_SUGGESTIONS = [
+  "미적분II", "기하", "확률과 통계", "물리학", "화학",
+  "생명과학", "역학과 에너지", "정보", "인공지능 기초",
+  "데이터 과학", "세포와 물질대사", "생물의 유전",
+];
 
 function shuffleAndPick<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
