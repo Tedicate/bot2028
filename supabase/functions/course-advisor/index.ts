@@ -536,26 +536,19 @@ serve(async (req) => {
             }
           }
 
-          // Also try university_courses fallback
+          // Also try university_subjects with broader search
           if (!contextBlock) {
-            const words = question.split(/\s+/).filter(w => w.length >= 2);
-            if (words.length > 0) {
-              const orFilters = words.map(w => `department.ilike.%${w}%,university.ilike.%${w}%`).join(",");
-              const { data: coursesData } = await supabase
-                .from("university_courses")
-                .select("*")
-                .or(orFilters)
-                .limit(100);
+            const { universityKeyword } = extractKeywords(question);
+            if (universityKeyword) {
+              const { data: fallbackData } = await supabase
+                .from('university_subjects')
+                .select('university, department, subject, is_core, is_recommended')
+                .ilike('university', `%${universityKeyword}%`)
+                .eq('year', 2028)
+                .limit(30);
 
-              if (coursesData && coursesData.length > 0) {
-                contextBlock = "## 조회된 대학별 권장과목 데이터\n\n";
-                for (const row of coursesData) {
-                  contextBlock += `### ${row.university} ${row.department || row.college || ""}\n`;
-                  if (row.core_subjects) contextBlock += `- **핵심 과목**: ${row.core_subjects}\n`;
-                  if (row.recommended_subjects) contextBlock += `- **권장 과목**: ${row.recommended_subjects}\n`;
-                  if (row.notes) contextBlock += `- **비고**: ${row.notes}\n`;
-                  contextBlock += "\n";
-                }
+              if (fallbackData && fallbackData.length > 0) {
+                contextBlock = formatSubjectRecommendations(fallbackData);
               }
             }
           }
