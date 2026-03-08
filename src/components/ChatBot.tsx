@@ -12,34 +12,14 @@ const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 const ADVISOR_URL = `${SUPABASE_URL}/functions/v1/course-advisor`;
 
 const ALL_DEPT_SUGGESTIONS = [
-  "서울대 컴퓨터공학부", "고려대 전기전자공학부", "경희대 간호학과",
-  "서울시립대 도시공학과", "중앙대 약학부", "동국대 컴퓨터·AI학부",
-  "서울대 의예과", "고려대 컴퓨터학과", "경희대 전자공학과",
-  "서울시립대 환경공학부", "숭실대 AI소프트웨어학부", "건국대 공학계열",
-  "서울대 약학과", "고려대 기계공학부", "경희대 화학공학과",
-  "중앙대 소프트웨어학부", "부산대 경영학과", "경북대 공과대학",
-  "서울시립대 경영학부", "동국대 약학과", "가톨릭대 의예과",
-  "인하대 기계공학과", "한양대 자연계열", "부산대 정보컴퓨터공학부",
-  "서울대 수의예과", "경희대 소프트웨어융합학과", "서울시립대 조경학과",
+  "경희대 간호학과", "경희대 컴퓨터공학과", "고려대 기계공학부",
 ];
 
 const ALL_ADMISSION_SUGGESTIONS = [
-  "서울대 2028 전형안", "고려대 2028 전형안", "연세대 2028 전형안",
-  "경희대 2028 전형안", "건국대 2028 전형안", "중앙대 2028 전형안",
-  "한양대 2028 전형안", "성균관대 2028 전형안", "서강대 2028 전형안",
-  "동국대 2028 전형안", "숭실대 2028 전형안", "홍익대 2028 전형안",
-  "인하대 2028 전형안", "서울시립대 2028 전형안", "부산대 2028 전형안",
+  "서울대 2028 전형안", "경희대 2028 전형안", "건국대 2028 전형안",
 ];
 
-const ALL_SUBJECT_SUGGESTIONS = [
-  "미적분II", "기하", "역학과 에너지", "물질과 에너지",
-  "정보", "인공지능 기초", "데이터 과학", "생명과학과 지구시스템",
-  "세계시민과 지리", "사회문화", "생활과 윤리", "정치와 법",
-  "심리학", "교육학", "보건",
-  "중국어", "일본어", "프랑스어", "확률과 통계",
-  "화학반응의 세계", "생명과학실험", "지구과학실험",
-  "국어", "영어", "한국사",
-];
+const ALL_SUBJECT_SUGGESTIONS: string[] = [];
 
 function shuffleAndPick<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
@@ -337,6 +317,7 @@ export default function ChatBot() {
                 </div>
               </div>
 
+              {subjectSuggestions.length > 0 && (
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
                 <div className="flex flex-wrap gap-2 min-h-[88px]">
@@ -358,6 +339,7 @@ export default function ChatBot() {
                   </AnimatePresence>
                 </div>
               </div>
+              )}
 
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📋 대학별 전형안</p>
