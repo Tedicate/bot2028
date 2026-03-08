@@ -478,132 +478,80 @@ serve(async (req) => {
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     const question = lastUserMsg?.content || "";
 
-    // Classify question type (평가/철학 계열은 무조건 documents 우선)
-    const forceDocumentsFirst = isAdmissionPhilosophyPriorityQuery(question);
-    const questionType = forceDocumentsFirst ? "admission_philosophy" : classifyQuestion(question);
-    console.log(`Routing => forceDocumentsFirst=${forceDocumentsFirst}, questionType=${questionType}, question="${question}"`);
+    // ── DEBUG MODE: 모든 검색을 무조건 실행하고 결과를 사용자에게 표시 ──
+    const { universityKeyword, departmentKeyword } = extractKeywords(question);
+    console.log(`[DEBUG] question="${question}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}"`);
 
-    // Build context based on question type
-    let contextBlock = "";
+    // 1) admission_plans SQL
+    let admissionPlansCount = 0;
+    let admissionPlansError = "없음";
+    let admissionPlansData: any[] | null = null;
+    try {
+      admissionPlansData = await queryAdmissionPlans(supabase, question);
+      admissionPlansCount = admissionPlansData?.length ?? 0;
+    } catch (e: any) {
+      admissionPlansError = e?.message || String(e);
+    }
 
-    switch (questionType) {
-      case "subject_recommendation": {
-        const data = await querySubjectRecommendations(supabase, question);
-        if (data && data.length > 0) {
-          contextBlock = formatSubjectRecommendations(data);
-        } else {
-          contextBlock = "해당 학과/대학에 대한 권장과목 데이터가 아직 등록되지 않았습니다.\n";
-        }
-        break;
+    // 2) documents 벡터 검색
+    let documentsCount = 0;
+    let documentsError = "없음";
+    let documentsData: any[] | null = null;
+    let embeddingSuccess = false;
+    try {
+      const embedding = await getEmbedding(GEMINI_API_KEY, question);
+      embeddingSuccess = !!embedding;
+      if (embedding) {
+        documentsData = await vectorSearchDocuments(supabase, embedding);
+        documentsCount = documentsData?.length ?? 0;
+      } else {
+        documentsError = "임베딩 생성 실패";
       }
+    } catch (e: any) {
+      documentsError = e?.message || String(e);
+    }
 
-      case "admission_plan": {
-        const data = await queryAdmissionPlans(supabase, question);
-        if (data && data.length > 0) {
-          contextBlock = formatAdmissionPlans(data);
-        } else {
-          // Fallback to vector search on admission_documents
-          const embedding = await getEmbedding(GEMINI_API_KEY, question);
-          if (embedding) {
-            const vectorData = await vectorSearchDocuments(supabase, embedding);
-            if (vectorData && vectorData.length > 0) {
-              contextBlock = formatVectorResults(vectorData, "관련 전형 문서 (벡터 검색)");
-            }
-          }
-          if (!contextBlock) {
-            contextBlock = "해당 전형 정보가 아직 등록되지 않았습니다.\n";
-          }
-        }
-        break;
-      }
+    // 3) university_subjects SQL
+    let uniSubjectsCount = 0;
+    let uniSubjectsError = "없음";
+    let uniSubjectsData: any[] | null = null;
+    try {
+      uniSubjectsData = await querySubjectRecommendations(supabase, question);
+      uniSubjectsCount = uniSubjectsData?.length ?? 0;
+    } catch (e: any) {
+      uniSubjectsError = e?.message || String(e);
+    }
 
-      case "subject_description": {
-        const embedding = await getEmbedding(GEMINI_API_KEY, question);
-        if (embedding) {
-          const data = await vectorSearchSubjectDescriptions(supabase, embedding);
-          if (data && data.length > 0) {
-            contextBlock = "## 과목 설명 검색 결과\n\n";
-            for (const item of data) {
-              contextBlock += `### ${item.subject_name} (${item.category})\n`;
-              contextBlock += `${item.content}\n\n`;
-            }
-          }
-        }
-        if (!contextBlock) {
-          contextBlock = "과목 설명은 위 시스템 프롬프트의 과목 설명 참고 자료를 활용하세요.\n";
-        }
-        break;
-      }
+    // 디버그 로그 블록 생성
+    const debugLog = `[시스템 디버그 로그]
+- 질문: "${question}"
+- 키워드 추출: university="${universityKeyword}", department="${departmentKeyword}"
+- 임베딩 생성: ${embeddingSuccess ? "성공" : "실패"}
+- admission_plans SQL 결과: ${admissionPlansCount}건 (에러: ${admissionPlansError})
+- documents 벡터 검색 결과: ${documentsCount}건 (에러: ${documentsError})${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 유사도: ${documentsData.slice(0, 3).map((d: any) => d.similarity?.toFixed(3)).join(", ")}` : ""}${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 미리보기: "${documentsData[0]?.content?.substring(0, 100)}..."` : ""}
+- university_subjects 결과: ${uniSubjectsCount}건 (에러: ${uniSubjectsError})
+`;
 
-      case "admission_philosophy": {
-        console.log("[routing] admission_philosophy => documents vector search first");
-        const embedding = await getEmbedding(GEMINI_API_KEY, question);
-        if (embedding) {
-          const docData = await vectorSearchDocuments(supabase, embedding);
-          if (docData && docData.length > 0) {
-            contextBlock = `## ⚠️ 아래 문서 데이터가 검색되었습니다. 반드시 이 내용을 기반으로 답변하세요.\n\n`;
-            contextBlock += formatVectorResults(docData, "관련 문서 (벡터 검색)");
-            console.log(`[routing] documents hit => ${docData.length}건, context length: ${contextBlock.length}자`);
-            console.log(`[routing] context preview: ${contextBlock.substring(0, 300)}...`);
-            break;
-          }
-        }
+    console.log(debugLog);
 
-        // documents 결과가 없을 때만 폴백
-        const subjectData = await querySubjectRecommendations(supabase, question);
-        if (subjectData && subjectData.length > 0) {
-          contextBlock = formatSubjectRecommendations(subjectData);
-          contextBlock += "\n\n> 참고: 전형 철학/평가 방식에 대한 상세 문서는 아직 등록되지 않았습니다. 위 권장과목 데이터를 참고하여 답변합니다.\n";
-        } else {
-          contextBlock = "해당 정보가 아직 등록되지 않았습니다.\n";
-        }
-        break;
-      }
+    // 컨텍스트 블록 조합 (찾은 데이터 모두 포함)
+    let contextBlock = debugLog + "\n---\n\n";
 
-      default: {
-        // General: try subject recommendation first, then vector search
-        const subjectData = await querySubjectRecommendations(supabase, question);
-        if (subjectData && subjectData.length > 0) {
-          contextBlock = formatSubjectRecommendations(subjectData);
-        } else {
-          const embedding = await getEmbedding(GEMINI_API_KEY, question);
-          if (embedding) {
-            // Try both vector searches
-            const [subDescData, docsData] = await Promise.all([
-              vectorSearchSubjectDescriptions(supabase, embedding),
-              vectorSearchDocuments(supabase, embedding),
-            ]);
+    if (documentsData && documentsData.length > 0) {
+      contextBlock += `## ⚠️ 아래 문서 데이터가 검색되었습니다. 반드시 이 내용을 기반으로 답변하세요.\n\n`;
+      contextBlock += formatVectorResults(documentsData, "관련 문서 (벡터 검색)");
+    }
 
-            if (subDescData && subDescData.length > 0) {
-              contextBlock += "## 과목 설명 검색 결과\n\n";
-              for (const item of subDescData) {
-                contextBlock += `### ${item.subject_name} (${item.category})\n${item.content}\n\n`;
-              }
-            }
-            if (docsData && docsData.length > 0) {
-              contextBlock += formatVectorResults(docsData, "관련 문서");
-            }
-          }
+    if (admissionPlansData && admissionPlansData.length > 0) {
+      contextBlock += formatAdmissionPlans(admissionPlansData);
+    }
 
-          // Also try university_subjects with broader search
-          if (!contextBlock) {
-            const { universityKeyword } = extractKeywords(question);
-            if (universityKeyword) {
-              const { data: fallbackData } = await supabase
-                .from('university_subjects')
-                .select('university, department, subject, is_core, is_recommended')
-                .ilike('university', `%${universityKeyword}%`)
-                .eq('year', 2028)
-                .limit(30);
+    if (uniSubjectsData && uniSubjectsData.length > 0) {
+      contextBlock += formatSubjectRecommendations(uniSubjectsData);
+    }
 
-              if (fallbackData && fallbackData.length > 0) {
-                contextBlock = formatSubjectRecommendations(fallbackData);
-              }
-            }
-          }
-        }
-        break;
-      }
+    if (documentsCount === 0 && admissionPlansCount === 0 && uniSubjectsCount === 0) {
+      contextBlock += "모든 검색에서 결과가 0건입니다. 데이터가 등록되어 있지 않을 수 있습니다.\n";
     }
 
     // Build Gemini request
@@ -742,6 +690,10 @@ serve(async (req) => {
 
     (async () => {
       try {
+        // 디버그 로그를 SSE 스트림 맨 앞에 직접 주입
+        const debugChunk = { choices: [{ delta: { content: debugLog + "\n---\n\n" } }] };
+        await writer.write(encoder.encode(`data: ${JSON.stringify(debugChunk)}\n\n`));
+
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
