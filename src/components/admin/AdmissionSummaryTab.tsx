@@ -19,8 +19,9 @@ export default function AdmissionSummaryTab() {
   const fetchSummary = async () => {
     setLoading(true);
     const { data: raw, error } = await supabase
-      .from("admission_documents")
-      .select("university, year, document_type");
+      .from("documents")
+      .select("metadata, created_at")
+      .limit(1000);
 
     if (error) {
       toast.error("로드 실패");
@@ -28,15 +29,19 @@ export default function AdmissionSummaryTab() {
       return;
     }
 
-    // Aggregate counts
+    // Aggregate counts from metadata
     const map = new Map<string, SummaryRow>();
     (raw || []).forEach((r: any) => {
-      const key = `${r.university}|${r.year}|${r.document_type}`;
+      const meta = r.metadata || {};
+      const uni = meta.university || "미지정";
+      const yr = meta.year || 0;
+      const dt = meta.document_type || "미지정";
+      const key = `${uni}|${yr}|${dt}`;
       const existing = map.get(key);
       if (existing) {
         existing.count++;
       } else {
-        map.set(key, { university: r.university, year: r.year, document_type: r.document_type, count: 1 });
+        map.set(key, { university: uni, year: yr, document_type: dt, count: 1 });
       }
     });
 
