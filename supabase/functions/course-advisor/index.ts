@@ -386,18 +386,26 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   return data && data.length > 0 ? data : null;
 }
 
-async function queryAdmissionPlans(supabase: any, question: string) {
-  const words = question.split(/\s+/).filter(w => w.length >= 2);
-  if (words.length === 0) return null;
+async function queryAdmissionPlans(supabase: any, question: string, universityKw: string, admissionKw: string) {
+  // Build query with extracted keywords
+  let query = supabase.from("admission_plans").select("*");
 
-  // Try to find university name in question
-  const orFilters = words.map(w => `university.ilike.%${w}%`).join(",");
-  const { data, error } = await supabase
-    .from("admission_plans")
-    .select("*")
-    .or(orFilters)
-    .order("university")
-    .limit(50);
+  if (universityKw) {
+    query = query.ilike("university", `%${universityKw}%`);
+  }
+  if (admissionKw) {
+    query = query.ilike("admission_type", `%${admissionKw}%`);
+  }
+
+  // If no keywords extracted, fallback to word-based search
+  if (!universityKw && !admissionKw) {
+    const words = question.split(/\s+/).filter(w => w.length >= 2);
+    if (words.length === 0) return null;
+    const orFilters = words.map(w => `university.ilike.%${w}%`).join(",");
+    query = supabase.from("admission_plans").select("*").or(orFilters);
+  }
+
+  const { data, error } = await query.order("university").limit(50);
 
   if (error) {
     console.error("admission_plans query error:", error);
