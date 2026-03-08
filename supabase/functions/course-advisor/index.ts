@@ -12,6 +12,11 @@ type QuestionType = "subject_recommendation" | "admission_plan" | "subject_descr
 function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
 
+  // 전형안 질문 (대학+전형안/전형 패턴)
+  if (/전형안|2028\s*전형|전형\s*종류|전형\s*목록|어떤\s*전형|전형\s*안내/.test(lower)) {
+    return "admission_plan";
+  }
+
   // 전형 철학/평가 방식 질문 (최우선 체크 — 벡터 검색 필요)
   if (/평가|방식|철학|어떤\s*학생|인재상|선발\s*기준|평가\s*기준|어떻게\s*평가|어떻게\s*선발|어떤\s*인재|가치|핵심\s*역량|역량|학생부종합|종합전형|학종/.test(lower)) {
     return "admission_philosophy";
@@ -33,8 +38,6 @@ function classifyQuestion(text: string): QuestionType {
   }
 
   // Default: try to detect if it's a university+department or subject name
-  // University names typically contain 대, 대학
-  // Subject names match known patterns
   const hasUniversityPattern = /대학?교?|대$/.test(lower);
   const hasDepartmentPattern = /학과|학부|계열|전공|예과/.test(lower);
 
