@@ -553,15 +553,15 @@ serve(async (req) => {
     const question = lastUserMsg?.content || "";
 
     // ── DEBUG MODE: 모든 검색을 무조건 실행하고 결과를 사용자에게 표시 ──
-    const { universityKeyword, departmentKeyword } = extractKeywords(question);
-    console.log(`[DEBUG] question="${question}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}"`);
+    const { universityKeyword, departmentKeyword, admissionKeyword } = extractKeywords(question);
+    console.log(`[DEBUG] question="${question}", uniKw="${universityKeyword}", deptKw="${departmentKeyword}", admKw="${admissionKeyword}"`);
 
     // 1) admission_plans SQL
     let admissionPlansCount = 0;
     let admissionPlansError = "없음";
     let admissionPlansData: any[] | null = null;
     try {
-      admissionPlansData = await queryAdmissionPlans(supabase, question);
+      admissionPlansData = await queryAdmissionPlans(supabase, question, universityKeyword, admissionKeyword);
       admissionPlansCount = admissionPlansData?.length ?? 0;
     } catch (e: any) {
       admissionPlansError = e?.message || String(e);
