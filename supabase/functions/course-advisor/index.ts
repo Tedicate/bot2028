@@ -233,9 +233,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     console.log('키워드 없음, 전체 질문으로 검색:', question);
     const { data, error } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('department', `%${question}%`)
-      .eq('year', 2028)
       .limit(100);
     if (error) console.error('university_subjects 쿼리 에러:', error);
     console.log('결과:', data?.length ?? 0, '행');
@@ -246,10 +245,9 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   if (universityKeyword && departmentKeyword) {
     const { data, error } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('university', `%${universityKeyword}%`)
-      .ilike('department', `%${departmentKeyword}%`)
-      .eq('year', 2028);
+      .ilike('department', `%${departmentKeyword}%`);
 
     if (error) console.error('university_subjects 쿼리 에러:', error);
     console.log('university_subjects 결과:', data?.length ?? 0, '행', 'university:', universityKeyword, 'department:', departmentKeyword);
@@ -259,9 +257,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
     // Fallback: university only
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('university_subjects')
-      .select('university, department, subject, is_core, is_recommended')
+      .select('university, department, subject, is_core, is_recommended, year')
       .ilike('university', `%${universityKeyword}%`)
-      .eq('year', 2028)
       .limit(30);
 
     if (fallbackError) console.error('폴백 쿼리 에러:', fallbackError);
@@ -274,9 +271,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   const filterVal = universityKeyword || departmentKeyword;
   const { data, error } = await supabase
     .from('university_subjects')
-    .select('university, department, subject, is_core, is_recommended')
+    .select('university, department, subject, is_core, is_recommended, year')
     .ilike(filterCol, `%${filterVal}%`)
-    .eq('year', 2028)
     .limit(200);
 
   if (error) console.error('university_subjects 쿼리 에러:', error);
