@@ -271,9 +271,8 @@ async function querySubjectRecommendations(supabase: any, question: string) {
   const filterVal = universityKeyword || departmentKeyword;
   const { data, error } = await supabase
     .from('university_subjects')
-    .select('university, department, subject, is_core, is_recommended')
+    .select('university, department, subject, is_core, is_recommended, year')
     .ilike(filterCol, `%${filterVal}%`)
-    .eq('year', 2028)
     .limit(200);
 
   if (error) console.error('university_subjects 쿼리 에러:', error);
