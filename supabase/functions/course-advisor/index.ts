@@ -481,7 +481,7 @@ async function vectorSearchDocuments(supabase: any, embedding: number[], univers
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
     match_threshold: 0.4,
-    match_count: 15, // fetch more to allow post-filtering
+    match_count: 15,
   });
 
   if (error) {
@@ -491,14 +491,23 @@ async function vectorSearchDocuments(supabase: any, embedding: number[], univers
 
   let results = data || [];
 
-  // Post-filter by university metadata if keyword exists
+  // Log each result's actual university metadata for debugging
+  if (results.length > 0) {
+    console.log(`[documents] 검색된 문서의 실제 대학명:`);
+    results.forEach((d: any, i: number) => {
+      console.log(`  [${i}] university="${d.metadata?.university || '(없음)'}", similarity=${d.similarity?.toFixed(3)}, preview="${d.content?.substring(0, 60)}..."`);
+    });
+  }
+
+  // Post-filter by university metadata — STRICT: no fallback to other universities
   if (universityKw && results.length > 0) {
     const filtered = results.filter((d: any) => {
       const docUni = d.metadata?.university || "";
       return docUni.includes(universityKw);
     });
     console.log(`[documents] university filter "${universityKw}": ${results.length} → ${filtered.length}`);
-    results = filtered.length > 0 ? filtered : results.slice(0, 3); // fallback to top 3 if nothing matches
+    // STRICT: if no documents match the university, return null (do NOT use other university's docs)
+    results = filtered;
   }
 
   console.log(`[documents] final results: ${results.length}`);
@@ -661,7 +670,7 @@ serve(async (req) => {
 - 키워드 추출: university="${universityKeyword}", department="${departmentKeyword}", admission="${admissionKeyword}"
 - 임베딩 생성: ${embeddingSuccess ? "성공" : "실패"}
 - admission_plans SQL 결과: ${admissionPlansCount}건 (에러: ${admissionPlansError})
-- documents 벡터 검색 결과: ${documentsCount}건 (에러: ${documentsError})${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 유사도: ${documentsData.slice(0, 3).map((d: any) => d.similarity?.toFixed(3)).join(", ")}` : ""}${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 미리보기: "${documentsData[0]?.content?.substring(0, 100)}..."` : ""}
+- documents 벡터 검색 결과: ${documentsCount}건 (에러: ${documentsError})${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 유사도 및 대학명: ${documentsData.slice(0, 5).map((d: any) => `[${d.similarity?.toFixed(3)}, uni="${d.metadata?.university || '(없음)'}"]`).join(", ")}` : ""}${documentsData && documentsData.length > 0 ? `\n  - 상위 문서 미리보기: "${documentsData[0]?.content?.substring(0, 100)}..."` : ""}
 - university_subjects 결과: ${uniSubjectsCount}건 (에러: ${uniSubjectsError})
 `;
 
@@ -684,7 +693,12 @@ serve(async (req) => {
     }
 
     if (documentsCount === 0 && admissionPlansCount === 0 && uniSubjectsCount === 0) {
-      contextBlock += "모든 검색에서 결과가 0건입니다. 데이터가 등록되어 있지 않을 수 있습니다.\n";
+      if (universityKeyword) {
+        contextBlock += `⚠️ "${universityKeyword}" 대학교의 2028학년도 전형 자료(admission_plans, documents, university_subjects)가 모두 등록되어 있지 않습니다.\n`;
+        contextBlock += `반드시 "현재 ${universityKeyword}대학교의 2028학년도 전형 자료는 등록되어 있지 않습니다"라고 정직하게 답변하세요. 다른 대학의 데이터를 빌려와서 답변하지 마세요.\n`;
+      } else {
+        contextBlock += "모든 검색에서 결과가 0건입니다. 데이터가 등록되어 있지 않을 수 있습니다.\n";
+      }
     }
 
     // Build Gemini request
