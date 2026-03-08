@@ -693,7 +693,12 @@ serve(async (req) => {
     }
 
     if (documentsCount === 0 && admissionPlansCount === 0 && uniSubjectsCount === 0) {
-      contextBlock += "모든 검색에서 결과가 0건입니다. 데이터가 등록되어 있지 않을 수 있습니다.\n";
+      if (universityKeyword) {
+        contextBlock += `⚠️ "${universityKeyword}" 대학교의 2028학년도 전형 자료(admission_plans, documents, university_subjects)가 모두 등록되어 있지 않습니다.\n`;
+        contextBlock += `반드시 "현재 ${universityKeyword}대학교의 2028학년도 전형 자료는 등록되어 있지 않습니다"라고 정직하게 답변하세요. 다른 대학의 데이터를 빌려와서 답변하지 마세요.\n`;
+      } else {
+        contextBlock += "모든 검색에서 결과가 0건입니다. 데이터가 등록되어 있지 않을 수 있습니다.\n";
+      }
     }
 
     // Build Gemini request
