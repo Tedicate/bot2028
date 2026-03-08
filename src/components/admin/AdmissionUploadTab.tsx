@@ -63,15 +63,17 @@ export default function AdmissionUploadTab() {
 
         const { embedding } = await embedResp.json();
 
-        const { error } = await supabase.from("admission_documents").insert({
-          university: chunk.university,
-          year: chunk.year ?? 2026,
-          document_type: chunk.document_type,
-          admission_type: chunk.admission_type,
-          content_type: chunk.content_type,
+        const { error } = await supabase.from("documents").insert({
           content: chunk.content,
+          metadata: {
+            university: chunk.university,
+            year: chunk.year ?? 2026,
+            document_type: chunk.document_type,
+            admission_type: chunk.admission_type,
+            content_type: chunk.content_type,
+            source_file: sourceFile,
+          },
           embedding: embedding as any,
-          source_file: sourceFile,
         } as any);
 
         if (error) {
