@@ -53,6 +53,54 @@ export type Database = {
         }
         Relationships: []
       }
+      admission_plans: {
+        Row: {
+          admission_category: string
+          admission_type: string
+          created_at: string | null
+          id: string
+          reflected_subjects: Json | null
+          selection_method: string
+          special_notes: string | null
+          subject_recommendation_applied: boolean
+          subject_recommendation_note: string | null
+          suneung_minimum: boolean
+          suneung_minimum_detail: string | null
+          university: string
+          year: number
+        }
+        Insert: {
+          admission_category?: string
+          admission_type?: string
+          created_at?: string | null
+          id?: string
+          reflected_subjects?: Json | null
+          selection_method?: string
+          special_notes?: string | null
+          subject_recommendation_applied?: boolean
+          subject_recommendation_note?: string | null
+          suneung_minimum?: boolean
+          suneung_minimum_detail?: string | null
+          university?: string
+          year?: number
+        }
+        Update: {
+          admission_category?: string
+          admission_type?: string
+          created_at?: string | null
+          id?: string
+          reflected_subjects?: Json | null
+          selection_method?: string
+          special_notes?: string | null
+          subject_recommendation_applied?: boolean
+          subject_recommendation_note?: string | null
+          suneung_minimum?: boolean
+          suneung_minimum_detail?: string | null
+          university?: string
+          year?: number
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           content: string
@@ -74,6 +122,36 @@ export type Database = {
           embedding?: string | null
           id?: never
           metadata?: Json | null
+        }
+        Relationships: []
+      }
+      subject_descriptions: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: number
+          metadata: Json | null
+          subject_name: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: never
+          metadata?: Json | null
+          subject_name?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: never
+          metadata?: Json | null
+          subject_name?: string
         }
         Relationships: []
       }
@@ -113,6 +191,45 @@ export type Database = {
         }
         Relationships: []
       }
+      university_subjects: {
+        Row: {
+          city: string
+          created_at: string | null
+          department: string
+          id: string
+          is_core: boolean
+          is_recommended: boolean
+          region: string
+          subject: string
+          university: string
+          year: number
+        }
+        Insert: {
+          city?: string
+          created_at?: string | null
+          department?: string
+          id?: string
+          is_core?: boolean
+          is_recommended?: boolean
+          region?: string
+          subject?: string
+          university?: string
+          year?: number
+        }
+        Update: {
+          city?: string
+          created_at?: string | null
+          department?: string
+          id?: string
+          is_core?: boolean
+          is_recommended?: boolean
+          region?: string
+          subject?: string
+          university?: string
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -129,6 +246,21 @@ export type Database = {
           id: number
           metadata: Json
           similarity: number
+        }[]
+      }
+      match_subject_descriptions: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          content: string
+          id: number
+          metadata: Json
+          similarity: number
+          subject_name: string
         }[]
       }
     }
