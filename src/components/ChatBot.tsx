@@ -317,6 +317,7 @@ export default function ChatBot() {
                 </div>
               </div>
 
+              {subjectSuggestions.length > 0 && (
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📚 주요 과목</p>
                 <div className="flex flex-wrap gap-2 min-h-[88px]">
@@ -338,6 +339,7 @@ export default function ChatBot() {
                   </AnimatePresence>
                 </div>
               </div>
+              )}
 
               <div className="w-full max-w-md">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">📋 대학별 전형안</p>
