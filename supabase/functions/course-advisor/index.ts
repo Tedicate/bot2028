@@ -354,8 +354,8 @@ async function vectorSearchSubjectDescriptions(supabase: any, embedding: number[
 async function vectorSearchDocuments(supabase: any, embedding: number[]) {
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
-    match_threshold: 0.5,
-    match_count: 5,
+    match_threshold: 0.4,
+    match_count: 8,
   });
 
   if (error) {
@@ -363,6 +363,7 @@ async function vectorSearchDocuments(supabase: any, embedding: number[]) {
     return null;
   }
 
+  console.log(`[documents] match_documents results: ${data?.length ?? 0}`);
   return data;
 }
 
