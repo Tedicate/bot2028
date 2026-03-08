@@ -13,7 +13,7 @@ function classifyQuestion(text: string): QuestionType {
   const lower = text.toLowerCase();
 
   // 전형 철학/평가 방식 질문 (최우선 체크 — 벡터 검색 필요)
-  if (/평가|방식|철학|어떤\s*학생|인재상|선발\s*기준|평가\s*기준|어떻게\s*평가|어떻게\s*선발|어떤\s*인재|가치|핵심\s*역량|역량/.test(lower)) {
+  if (/평가|방식|철학|어떤\s*학생|인재상|선발\s*기준|평가\s*기준|어떻게\s*평가|어떻게\s*선발|어떤\s*인재|가치|핵심\s*역량|역량|학생부종합|학종/.test(lower)) {
     return "admission_philosophy";
   }
 
@@ -43,6 +43,11 @@ function classifyQuestion(text: string): QuestionType {
   }
 
   return "general";
+}
+
+function isAdmissionPhilosophyPriorityQuery(text: string): boolean {
+  const lower = text.toLowerCase();
+  return /평가|방식|철학|어떤\s*학생|인재상|학생부종합|학종|선발\s*기준|평가\s*기준/.test(lower);
 }
 
 // ── Course descriptions (static, small) ──
@@ -349,8 +354,8 @@ async function vectorSearchSubjectDescriptions(supabase: any, embedding: number[
 async function vectorSearchDocuments(supabase: any, embedding: number[]) {
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
-    match_threshold: 0.5,
-    match_count: 5,
+    match_threshold: 0.4,
+    match_count: 8,
   });
 
   if (error) {
@@ -358,6 +363,7 @@ async function vectorSearchDocuments(supabase: any, embedding: number[]) {
     return null;
   }
 
+  console.log(`[documents] match_documents results: ${data?.length ?? 0}`);
   return data;
 }
 
@@ -467,9 +473,10 @@ serve(async (req) => {
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     const question = lastUserMsg?.content || "";
 
-    // Classify question type
-    const questionType = classifyQuestion(question);
-    console.log(`Question type: ${questionType}, question: "${question}"`);
+    // Classify question type (평가/철학 계열은 무조건 documents 우선)
+    const forceDocumentsFirst = isAdmissionPhilosophyPriorityQuery(question);
+    const questionType = forceDocumentsFirst ? "admission_philosophy" : classifyQuestion(question);
+    console.log(`Routing => forceDocumentsFirst=${forceDocumentsFirst}, questionType=${questionType}, question="${question}"`);
 
     // Build context based on question type
     let contextBlock = "";
@@ -524,39 +531,25 @@ serve(async (req) => {
       }
 
       case "admission_philosophy": {
+        console.log("[routing] admission_philosophy => documents vector search first");
         const embedding = await getEmbedding(GEMINI_API_KEY, question);
         if (embedding) {
-          let allResults = await vectorSearchDocuments(supabase, embedding);
-          
-          // Post-filter by university keyword if present (partial match)
-          const { universityKeyword } = extractKeywords(question);
-          if (allResults && allResults.length > 0 && universityKeyword) {
-            const filtered = allResults.filter((item: any) => {
-              const meta = item.metadata;
-              if (!meta) return true; // keep items without metadata
-              const metaStr = JSON.stringify(meta);
-              return metaStr.includes(universityKeyword);
-            });
-            // Use filtered if any match, otherwise keep all results
-            if (filtered.length > 0) {
-              allResults = filtered;
-            }
-            console.log(`벡터 검색 메타데이터 필터: "${universityKeyword}" → ${filtered.length}/${allResults.length}건`);
-          }
-          
-          if (allResults && allResults.length > 0) {
-            contextBlock = formatVectorResults(allResults, "관련 문서 (벡터 검색)");
+          const docData = await vectorSearchDocuments(supabase, embedding);
+          if (docData && docData.length > 0) {
+            // documents 결과가 1건 이상이면 절대 권장과목 폴백으로 가지 않음
+            contextBlock = formatVectorResults(docData, "관련 문서 (벡터 검색)");
+            console.log("[routing] documents hit => skip subject fallback");
+            break;
           }
         }
-        if (!contextBlock) {
-          // Fallback: 권장과목 데이터라도 제공
-          const subjectData = await querySubjectRecommendations(supabase, question);
-          if (subjectData && subjectData.length > 0) {
-            contextBlock = formatSubjectRecommendations(subjectData);
-            contextBlock += "\n\n> 참고: 전형 철학/평가 방식에 대한 상세 문서는 아직 등록되지 않았습니다. 위 권장과목 데이터를 참고하여 답변합니다.\n";
-          } else {
-            contextBlock = "해당 정보가 아직 등록되지 않았습니다.\n";
-          }
+
+        // documents 결과가 없을 때만 폴백
+        const subjectData = await querySubjectRecommendations(supabase, question);
+        if (subjectData && subjectData.length > 0) {
+          contextBlock = formatSubjectRecommendations(subjectData);
+          contextBlock += "\n\n> 참고: 전형 철학/평가 방식에 대한 상세 문서는 아직 등록되지 않았습니다. 위 권장과목 데이터를 참고하여 답변합니다.\n";
+        } else {
+          contextBlock = "해당 정보가 아직 등록되지 않았습니다.\n";
         }
         break;
       }
