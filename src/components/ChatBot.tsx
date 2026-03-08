@@ -110,58 +110,71 @@ export default function ChatBot() {
     setInput("");
     setIsLoading(true);
 
-    const addAssistantMessage = (text: string) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
-    };
-
     try {
-      // Step 1: Embed the user's question
-      const embedResp = await fetch(EMBED_URL, {
+      const resp = await fetch(ADVISOR_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
-        body: JSON.stringify({ text: trimmed, taskType: "RETRIEVAL_QUERY" }),
+        body: JSON.stringify({ messages: newMessages }),
       });
 
-      if (!embedResp.ok) {
-        addAssistantMessage("⚠️ 질문 처리 중 오류가 발생했습니다.");
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "오류가 발생했습니다." }));
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err.error || "오류가 발생했습니다."}` }]);
         setIsLoading(false);
         return;
       }
 
-      const { embedding } = await embedResp.json();
+      // SSE streaming
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantContent = "";
+      let assistantAdded = false;
 
-      // Step 2: Search similar documents
-      const { data: matches, error: matchError } = await supabase.rpc("match_documents", {
-        query_embedding: embedding,
-        match_threshold: 0.5,
-        match_count: 5,
-      } as any);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
 
-      const contexts: string[] = (matches || []).map((m: any) => m.content);
+        let newlineIdx: number;
+        while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, newlineIdx);
+          buffer = buffer.slice(newlineIdx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
 
-      // Step 3: Generate answer via gemini-chat
-      const chatResp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
-        body: JSON.stringify({
-          question: trimmed,
-          contexts,
-          messages: newMessages.slice(0, -1), // previous history
-        }),
-      });
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+          if (!jsonStr) continue;
 
-      if (!chatResp.ok) {
-        const err = await chatResp.json().catch(() => ({ error: "오류가 발생했습니다." }));
-        addAssistantMessage(`⚠️ ${err.error || "오류가 발생했습니다."}`);
-        setIsLoading(false);
-        return;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              assistantContent += delta;
+              if (!assistantAdded) {
+                assistantAdded = true;
+                setMessages((prev) => [...prev, { role: "assistant", content: assistantContent }]);
+              } else {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: "assistant", content: assistantContent };
+                  return updated;
+                });
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
       }
 
-      const { answer } = await chatResp.json();
-      addAssistantMessage(answer || "답변을 생성할 수 없습니다.");
+      if (!assistantAdded) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "답변을 생성할 수 없습니다." }]);
+      }
     } catch (e) {
       console.error(e);
-      addAssistantMessage("⚠️ 네트워크 오류가 발생했습니다. 다시 시도해주세요.");
+      setMessages((prev) => [...prev, { role: "assistant", content: "⚠️ 네트워크 오류가 발생했습니다. 다시 시도해주세요." }]);
     }
 
     setIsLoading(false);
