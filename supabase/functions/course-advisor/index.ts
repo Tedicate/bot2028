@@ -481,7 +481,7 @@ async function vectorSearchDocuments(supabase: any, embedding: number[], univers
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
     match_threshold: 0.4,
-    match_count: 15, // fetch more to allow post-filtering
+    match_count: 15,
   });
 
   if (error) {
@@ -491,14 +491,23 @@ async function vectorSearchDocuments(supabase: any, embedding: number[], univers
 
   let results = data || [];
 
-  // Post-filter by university metadata if keyword exists
+  // Log each result's actual university metadata for debugging
+  if (results.length > 0) {
+    console.log(`[documents] 검색된 문서의 실제 대학명:`);
+    results.forEach((d: any, i: number) => {
+      console.log(`  [${i}] university="${d.metadata?.university || '(없음)'}", similarity=${d.similarity?.toFixed(3)}, preview="${d.content?.substring(0, 60)}..."`);
+    });
+  }
+
+  // Post-filter by university metadata — STRICT: no fallback to other universities
   if (universityKw && results.length > 0) {
     const filtered = results.filter((d: any) => {
       const docUni = d.metadata?.university || "";
       return docUni.includes(universityKw);
     });
     console.log(`[documents] university filter "${universityKw}": ${results.length} → ${filtered.length}`);
-    results = filtered.length > 0 ? filtered : results.slice(0, 3); // fallback to top 3 if nothing matches
+    // STRICT: if no documents match the university, return null (do NOT use other university's docs)
+    results = filtered;
   }
 
   console.log(`[documents] final results: ${results.length}`);
